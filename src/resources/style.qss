@@ -306,15 +306,17 @@ QPushButton#btnPrimary:hover { background-color: #6d28d9; }
 /* ── Progress Bar ──────────────────────────────────────────────────────── */
 QProgressBar {
     background-color: #313244;
-    border: none;
-    border-radius: 3px;
-    height: 4px;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    height: 18px;
     text-align: center;
-    color: transparent;
+    color: #cdd6f4;
+    font-size: 8pt;
+    font-weight: bold;
 }
 QProgressBar::chunk {
     background-color: #7c3aed;
-    border-radius: 3px;
+    border-radius: 5px;
 }
 
 /* ── Tooltip ───────────────────────────────────────────────────────────── */

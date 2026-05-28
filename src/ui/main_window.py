@@ -351,6 +351,7 @@ class MainWindow(QMainWindow):
         self._detections: list[detection_engine.Detection] = []
         self._worker: LoadWorker | None = None
         self._highlighted_ids: set[int] = set()
+        self._loading_fname: str = ""
 
         self._load_style()
         self._build_ui()
@@ -425,12 +426,21 @@ class MainWindow(QMainWindow):
             tb.addWidget(cb)
 
         # ── Progress bar (hidden until loading) ──────────────────────────
-        self._progress = QProgressBar()
-        self._progress.setFixedWidth(160)
-        self._progress.setFixedHeight(4)
-        self._progress.setRange(0, 100)
-        self._progress.setVisible(False)
         tb.addSeparator()
+        self._load_label = QLabel()
+        self._load_label.setStyleSheet(
+            "color: #a6adc8; font-size: 8pt; background: transparent; padding: 0 4px;"
+        )
+        self._load_label.setVisible(False)
+        tb.addWidget(self._load_label)
+
+        self._progress = QProgressBar()
+        self._progress.setFixedWidth(200)
+        self._progress.setFixedHeight(18)
+        self._progress.setRange(0, 100)
+        self._progress.setFormat("%p%")
+        self._progress.setTextVisible(True)
+        self._progress.setVisible(False)
         tb.addWidget(self._progress)
 
         # ── Central splitter ──────────────────────────────────────────────
@@ -551,30 +561,48 @@ class MainWindow(QMainWindow):
         self._model.clear()
         self._events = []
         self._clear_detections()
+        self._loading_fname = Path(path).name
         self._progress.setValue(0)
         self._progress.setVisible(True)
-        fname = Path(path).name
-        self._status_label.setText(f"Loading {fname}…")
+        self._load_label.setText(f"Loading  {self._loading_fname}")
+        self._load_label.setVisible(True)
+        self._status_label.setText(f"Loading {self._loading_fname}…")
 
         self._worker = LoadWorker(path, file_type)
         self._worker.batch_ready.connect(self._on_batch_ready)
         self._worker.finished.connect(self._on_load_finished)
         self._worker.failed.connect(self._on_load_error)
         self._worker.progress.connect(self._progress.setValue)
+        self._worker.progress.connect(self._on_progress_update)
         self._worker.start()
+
+    def _on_progress_update(self, _value: int) -> None:
+        count = len(self._events)
+        if count:
+            self._load_label.setText(f"Loading  {self._loading_fname}  —  {count:,} events")
 
     def _on_batch_ready(self, events: list[ParsedEvent]) -> None:
         self._events.extend(events)
         self._model.append_batch(events)
+        self._load_label.setText(
+            f"Loading  {self._loading_fname}  —  {len(self._events):,} events"
+        )
 
     def _on_load_finished(self, total: int) -> None:
-        self._progress.setVisible(False)
+        from PySide6.QtCore import QTimer
+        self._progress.setValue(100)
+        self._load_label.setText(f"Done  —  {total:,} events loaded")
+        QTimer.singleShot(1800, lambda: (
+            self._progress.setVisible(False),
+            self._load_label.setVisible(False),
+        ))
         self.setWindowTitle(f"LogHawk — {total:,} events loaded")
         self._run_detections()
         self._update_status()
 
     def _on_load_error(self, msg: str) -> None:
         self._progress.setVisible(False)
+        self._load_label.setVisible(False)
         QMessageBox.critical(self, "Load Error", msg)
         self._update_status()
 
