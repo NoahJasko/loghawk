@@ -221,28 +221,46 @@ class EventFilter(QSortFilterProxyModel):
 # ── Background loader thread ──────────────────────────────────────────────────
 
 class LoadWorker(QThread):
-    batch_ready = Signal(list)     # list[ParsedEvent]
-    finished    = Signal(int)      # total loaded
-    failed      = Signal(str)      # error message
-    progress    = Signal(int)      # 0–100
+    batch_ready = Signal(list)   # list[ParsedEvent] — emitted in chunks
+    finished    = Signal(int)    # total events loaded
+    failed      = Signal(str)    # error message
+    progress    = Signal(int)    # 0–100
 
     def __init__(self, filepath: str, file_type: str):
         super().__init__()
         self.filepath  = filepath
         self.file_type = file_type  # 'evtx' | 'csv'
+        self._count    = 0
 
     def run(self) -> None:
+        def on_batch(batch: list) -> None:
+            self._count += len(batch)
+            self.batch_ready.emit(batch)
+
         try:
             if self.file_type == "evtx":
                 from ..core.parser_evtx import parse_evtx
-                events = parse_evtx(self.filepath, progress_cb=self.progress.emit)
+                parse_evtx(self.filepath, progress_cb=self.progress.emit, batch_cb=on_batch)
             else:
                 from ..core.parser_csv import parse_csv
-                events = parse_csv(self.filepath, progress_cb=self.progress.emit)
-            self.batch_ready.emit(events)
-            self.finished.emit(len(events))
+                parse_csv(self.filepath, progress_cb=self.progress.emit, batch_cb=on_batch)
+            self.finished.emit(self._count)
         except Exception as exc:
             self.failed.emit(str(exc))
+
+
+# ── Background detection thread ───────────────────────────────────────────────
+
+class DetectionWorker(QThread):
+    finished = Signal(list)   # list[Detection]
+
+    def __init__(self, events: list):
+        super().__init__()
+        self._events = events
+
+    def run(self) -> None:
+        results = detection_engine.analyze(self._events)
+        self.finished.emit(results)
 
 
 # ── Detection card widget ─────────────────────────────────────────────────────
@@ -350,6 +368,7 @@ class MainWindow(QMainWindow):
         self._events: list[ParsedEvent] = []
         self._detections: list[detection_engine.Detection] = []
         self._worker: LoadWorker | None = None
+        self._det_worker: DetectionWorker | None = None
         self._highlighted_ids: set[int] = set()
         self._loading_fname: str = ""
 
@@ -591,13 +610,23 @@ class MainWindow(QMainWindow):
     def _on_load_finished(self, total: int) -> None:
         from PySide6.QtCore import QTimer
         self._progress.setValue(100)
-        self._load_label.setText(f"Done  —  {total:,} events loaded")
+        self._load_label.setText(f"Done  —  {total:,} events  |  Running detections…")
+        self.setWindowTitle(f"LogHawk — {total:,} events loaded")
+        self._update_status()
+
+        # Run detection in the background — never blocks the UI
+        self._det_worker = DetectionWorker(list(self._events))
+        self._det_worker.finished.connect(self._on_detections_ready)
+        self._det_worker.start()
+
         QTimer.singleShot(1800, lambda: (
             self._progress.setVisible(False),
             self._load_label.setVisible(False),
         ))
-        self.setWindowTitle(f"LogHawk — {total:,} events loaded")
-        self._run_detections()
+
+    def _on_detections_ready(self, detections: list) -> None:
+        self._detections = detections
+        self._populate_detections_dock()
         self._update_status()
 
     def _on_load_error(self, msg: str) -> None:
@@ -608,15 +637,25 @@ class MainWindow(QMainWindow):
 
     # ── Detections ──────────────────────────────────────────────────────────
     def _run_detections(self) -> None:
+        """Manual re-run triggered from the View menu — runs in background."""
         self._clear_detections()
         if not self._events:
             return
-        self._detections = detection_engine.analyze(self._events)
+        self._det_header_lbl.setText("Running detections…")
+        self._det_worker = DetectionWorker(list(self._events))
+        self._det_worker.finished.connect(self._on_detections_ready)
+        self._det_worker.start()
+
+    def _populate_detections_dock(self) -> None:
+        """Rebuild detection cards from self._detections (call after analysis)."""
+        self._clear_detections()
+        if not self._detections:
+            return
+
         sev_counts: dict[str, int] = {}
         for d in self._detections:
             sev_counts[d.severity] = sev_counts.get(d.severity, 0) + 1
 
-        # Build header summary
         parts = []
         for sev in ("critical", "high", "medium", "low"):
             cnt = sev_counts.get(sev, 0)
@@ -627,7 +666,6 @@ class MainWindow(QMainWindow):
         self._det_header_lbl.setText(header_html)
         self._det_header_lbl.setTextFormat(Qt.RichText)
 
-        # Build cards (remove old stretch first)
         count = self._det_layout.count()
         if count > 0:
             stretch_item = self._det_layout.takeAt(count - 1)
@@ -639,7 +677,6 @@ class MainWindow(QMainWindow):
             self._det_layout.addWidget(card)
 
         self._det_layout.addStretch()
-        self._update_status()
 
     def _clear_detections(self) -> None:
         while self._det_layout.count() > 0:

@@ -19,8 +19,43 @@ _Q  = f"{{{_NS}}}"
 
 WINDOWS = sys.platform == "win32"
 
+# Only keep fields actually used by the detection engine or displayed in the
+# details panel.  Storing every XML field for millions of events is the primary
+# cause of multi-GB RAM usage.
+_KEEP_FIELDS: frozenset[str] = frozenset({
+    # Identity
+    "SubjectUserName", "SubjectDomainName", "SubjectUserSid",
+    "TargetUserName",  "TargetDomainName",  "TargetUserSid",
+    "TargetServerName", "SamAccountName", "UserPrincipalName",
+    # Network / logon
+    "IpAddress", "IpPort", "WorkstationName",
+    "LogonType", "AuthenticationPackageName", "PackageName", "LogonProcessName",
+    # Kerberos
+    "TicketEncryptionType", "TicketOptions", "ServiceName",
+    "PreAuthType", "Status", "SubStatus",
+    # Object / DS
+    "Properties", "ObjectServer", "ObjectType", "ObjectName", "AccessMask",
+    # Account management
+    "GroupName", "GroupSid", "MemberName", "MemberSid",
+    "NewUacValue", "OldUacValue",
+    # Scheduled tasks
+    "TaskName", "TaskContent",
+    # Services
+    "ServiceFileName", "ServiceType", "StartType", "ServiceAccount",
+    # Privileges
+    "PrivilegeList",
+    # Firewall / time
+    "SettingValueName", "NewTime", "OldTime",
+    # Process (LOLBin detection)
+    "NewProcessName", "CommandLine", "ParentProcessName",
+    # LSA packages
+    "NotificationPackageName",
+    # SID history
+    "SidHistory",
+})
 
-@dataclass
+
+@dataclass(slots=True)
 class ParsedEvent:
     record_id:    int
     event_id:     int
@@ -31,13 +66,13 @@ class ParsedEvent:
     source_ip:    str
     logon_type:   str
     auth_package: str
-    raw_fields:   dict[str, str] = field(default_factory=dict)
+    raw_fields:   dict
     # enriched from event_db
-    name:  str = ""
-    cat:   str = "other"
-    sev:   str = "info"
-    desc:  str = ""
-    mitre: list[str] = field(default_factory=list)
+    name:  str
+    cat:   str
+    sev:   str
+    desc:  str
+    mitre: list
 
 
 def _parse_xml(xml_str: str) -> ParsedEvent | None:
@@ -58,7 +93,6 @@ def _parse_xml(xml_str: str) -> ParsedEvent | None:
     record_id = int(sys_text("EventRecordID") or 0)
     computer  = sys_text("Computer")
 
-    # Parse timestamp
     time_el = sys_el.find(f"{_Q}TimeCreated")
     timestamp: datetime | None = None
     if time_el is not None:
@@ -71,32 +105,21 @@ def _parse_xml(xml_str: str) -> ParsedEvent | None:
         except ValueError:
             pass
 
-    # Collect EventData key-value pairs
+    # Collect EventData — only keep fields in _KEEP_FIELDS
     raw_fields: dict[str, str] = {}
     for section_tag in ("EventData", "UserData"):
         section = root.find(f"{_Q}{section_tag}")
         if section is not None:
             for data in section.iter(f"{_Q}Data"):
-                name  = data.get("Name") or data.tag
-                value = data.text or ""
-                raw_fields[name] = value.strip()
-            # Also grab any un-named text
-            if section.text and section.text.strip():
-                raw_fields["_text"] = section.text.strip()
+                name  = data.get("Name") or ""
+                if name in _KEEP_FIELDS:
+                    raw_fields[name] = (data.text or "").strip()
 
     def rf(key: str) -> str:
-        return raw_fields.get(key, "").strip()
+        return raw_fields.get(key, "")
 
-    # Resolve user — prefer target, fall back to subject
-    user   = rf("TargetUserName") or rf("SubjectUserName") or rf("UserName") or "-"
-    domain = rf("TargetDomainName") or rf("SubjectDomainName") or "-"
-
-    # Mask machine accounts and system accounts from the user display
-    if user.endswith("$") or user in ("-", "SYSTEM", "LOCAL SERVICE", "NETWORK SERVICE"):
-        display_user = user
-    else:
-        display_user = user
-
+    user         = rf("TargetUserName") or rf("SubjectUserName") or "-"
+    domain       = rf("TargetDomainName") or rf("SubjectDomainName") or "-"
     source_ip    = rf("IpAddress") or rf("WorkstationName") or "-"
     logon_type   = rf("LogonType")
     auth_package = rf("AuthenticationPackageName") or rf("PackageName")
@@ -107,7 +130,7 @@ def _parse_xml(xml_str: str) -> ParsedEvent | None:
         event_id=event_id,
         timestamp=timestamp,
         computer=computer,
-        user=display_user,
+        user=user,
         domain=domain,
         source_ip=source_ip,
         logon_type=logon_type,
@@ -121,13 +144,19 @@ def _parse_xml(xml_str: str) -> ParsedEvent | None:
     )
 
 
+_EMIT_BATCH = 2_000   # events per batch emitted to the UI thread
+
+
 def parse_evtx(
     filepath: str | Path,
     progress_cb: Callable[[int], None] | None = None,
+    batch_cb: Callable[[list[ParsedEvent]], None] | None = None,
 ) -> list[ParsedEvent]:
     """
-    Parse a .evtx file and return a list of ParsedEvent objects.
-    Requires Windows + pywin32.  On other platforms raises RuntimeError.
+    Parse a .evtx file.  If batch_cb is provided events are streamed in
+    chunks of _EMIT_BATCH and an empty list is returned; otherwise all
+    events are collected and returned (higher peak memory).
+    Requires Windows + pywin32.
     """
     if not WINDOWS:
         raise RuntimeError(
@@ -137,7 +166,6 @@ def parse_evtx(
 
     try:
         import win32evtlog  # type: ignore
-        import win32con     # type: ignore  # noqa: F401
         import pywintypes   # type: ignore
     except ImportError as exc:
         raise RuntimeError(
@@ -146,7 +174,7 @@ def parse_evtx(
         ) from exc
 
     path = str(Path(filepath).resolve())
-    events: list[ParsedEvent] = []
+    total_hint = _get_record_count(path)
 
     try:
         query = win32evtlog.EvtQuery(
@@ -156,12 +184,13 @@ def parse_evtx(
     except pywintypes.error as exc:
         raise RuntimeError(f"Cannot open log file: {exc}") from exc
 
-    batch = 200
-    total_hint = _get_record_count(path)
+    collected: list[ParsedEvent] = []
+    pending:   list[ParsedEvent] = []
+    total_parsed = 0
 
     while True:
         try:
-            raw_events = win32evtlog.EvtNext(query, batch)
+            raw_events = win32evtlog.EvtNext(query, 500)
         except pywintypes.error:
             break
         if not raw_events:
@@ -173,23 +202,35 @@ def parse_evtx(
             except pywintypes.error:
                 continue
             ev = _parse_xml(xml_str)
-            if ev is not None:
-                events.append(ev)
+            if ev is None:
+                continue
+            total_parsed += 1
+            if batch_cb:
+                pending.append(ev)
+                if len(pending) >= _EMIT_BATCH:
+                    batch_cb(pending)
+                    pending = []
+            else:
+                collected.append(ev)
 
         if progress_cb and total_hint:
-            progress_cb(min(99, int(len(events) / total_hint * 100)))
+            progress_cb(min(99, int(total_parsed / total_hint * 100)))
+
+    # flush remaining
+    if batch_cb and pending:
+        batch_cb(pending)
 
     if progress_cb:
         progress_cb(100)
-    return events
+
+    return collected  # empty when batch_cb was used
 
 
 def _get_record_count(path: str) -> int:
-    """Best-effort total record count for progress reporting."""
     try:
         import win32evtlog  # type: ignore
         import pywintypes   # type: ignore
-        log = win32evtlog.EvtOpenLog(None, path, win32evtlog.EvtOpenFilePath)
+        log   = win32evtlog.EvtOpenLog(None, path, win32evtlog.EvtOpenFilePath)
         props = win32evtlog.EvtGetLogInfo(log, win32evtlog.EvtLogNumberOfLogRecords)
         return int(props)
     except Exception:
