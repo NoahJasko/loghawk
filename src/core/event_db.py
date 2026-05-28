@@ -1,15 +1,22 @@
 import json
+import sys
 from pathlib import Path
 from functools import lru_cache
 
 _DB: dict = {}
-_DB_PATH = Path(__file__).parent.parent / "data" / "security_events.json"
+
+
+def _db_path() -> Path:
+    if getattr(sys, "frozen", False):
+        # PyInstaller onefile: data files land at sys._MEIPASS/data/
+        return Path(sys._MEIPASS) / "data" / "security_events.json"  # type: ignore[attr-defined]
+    return Path(__file__).parent.parent / "data" / "security_events.json"
 
 
 def load() -> dict:
     global _DB
     if not _DB:
-        with open(_DB_PATH, encoding="utf-8") as f:
+        with open(_db_path(), encoding="utf-8") as f:
             _DB = json.load(f)
     return _DB
 

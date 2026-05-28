@@ -359,7 +359,10 @@ class MainWindow(QMainWindow):
 
     # ── Stylesheet ─────────────────────────────────────────────────────────
     def _load_style(self) -> None:
-        qss_path = Path(__file__).parent.parent / "resources" / "style.qss"
+        if getattr(sys, "frozen", False):
+            qss_path = Path(sys._MEIPASS) / "resources" / "style.qss"  # type: ignore[attr-defined]
+        else:
+            qss_path = Path(__file__).parent.parent / "resources" / "style.qss"
         if qss_path.exists():
             QApplication.instance().setStyleSheet(qss_path.read_text(encoding="utf-8"))
 

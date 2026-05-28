@@ -8,7 +8,7 @@ HERE = Path(SPECPATH)
 SRC  = HERE / "src"
 
 a = Analysis(
-    [str(SRC / "main.py")],
+    [str(HERE / "loghawk.py")],
     pathex=[str(HERE)],
     binaries=[],
     datas=[
