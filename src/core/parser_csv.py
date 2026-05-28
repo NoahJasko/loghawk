@@ -100,6 +100,7 @@ def parse_csv(
             logon_type=logon_type,
             auth_package=auth_package,
             raw_fields=raw_fields,
+            raw_xml="",   # CSV exports have no original XML
             name=info["name"],
             cat=info["cat"],
             sev=info["sev"],

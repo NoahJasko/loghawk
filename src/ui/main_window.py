@@ -358,6 +358,50 @@ class DetectionCard(QFrame):
         super().mousePressEvent(event)
 
 
+# ── On-demand full field parser ───────────────────────────────────────────────
+
+def _all_fields_from_event(ev: ParsedEvent) -> dict[str, str]:
+    """
+    Return every key-value field for an event.
+    For EVTX events: re-parses the stored raw XML to get ALL fields.
+    For CSV events:  returns the fields already stored in raw_fields.
+    Called only when the user clicks a row — never during bulk loading.
+    """
+    if ev.raw_xml:
+        import xml.etree.ElementTree as ET
+        _NS = "http://schemas.microsoft.com/win/2004/08/events/event"
+        _Q  = f"{{{_NS}}}"
+        fields: dict[str, str] = {}
+        try:
+            root = ET.fromstring(ev.raw_xml)
+            # System fields
+            sys_el = root.find(f"{_Q}System")
+            if sys_el is not None:
+                for child in sys_el:
+                    tag = child.tag.replace(_Q, "")
+                    if child.text and child.text.strip():
+                        fields[tag] = child.text.strip()
+                    # Include attributes (e.g. TimeCreated SystemTime=...)
+                    for attr, val in child.attrib.items():
+                        if val:
+                            fields[f"{tag}.{attr}"] = val
+            # EventData / UserData — every Data element
+            for section_tag in ("EventData", "UserData"):
+                section = root.find(f"{_Q}{section_tag}")
+                if section is not None:
+                    for data in section.iter(f"{_Q}Data"):
+                        name  = data.get("Name") or data.tag.replace(_Q, "")
+                        value = (data.text or "").strip()
+                        fields[name] = value
+                    if section.text and section.text.strip():
+                        fields["_text"] = section.text.strip()
+        except Exception:
+            fields = dict(ev.raw_fields)
+        return fields
+    # CSV path — raw_fields already contains all available columns
+    return dict(ev.raw_fields)
+
+
 # ── Main Window ───────────────────────────────────────────────────────────────
 
 class MainWindow(QMainWindow):
@@ -743,14 +787,16 @@ class MainWindow(QMainWindow):
         """
         self._detail_summary.setHtml(html)
 
-        # Raw fields tab
-        if ev.raw_fields:
-            rows = "\n".join(
-                f"  {k:<35} {v}" for k, v in sorted(ev.raw_fields.items())
+        # Raw Fields tab — parse full XML on demand so the user sees every field
+        all_fields = _all_fields_from_event(ev)
+        if all_fields:
+            rows = "\n".join(f"  {k:<40} {v}" for k, v in sorted(all_fields.items()))
+            self._detail_raw.setPlainText(
+                f"EventID:  {ev.event_id}\nRecord:   {ev.record_id}\n"
+                f"Computer: {ev.computer}\nChannel:  Security\n\n{rows}"
             )
-            self._detail_raw.setPlainText(f"EventID: {ev.event_id}\nRecord:  {ev.record_id}\n\n{rows}")
         else:
-            self._detail_raw.setPlainText("(no raw fields)")
+            self._detail_raw.setPlainText("(no field data)")
 
     # ── Filters ─────────────────────────────────────────────────────────────
     def _on_search(self, text: str) -> None:

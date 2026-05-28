@@ -66,7 +66,8 @@ class ParsedEvent:
     source_ip:    str
     logon_type:   str
     auth_package: str
-    raw_fields:   dict
+    raw_fields:   dict   # ~30 key fields for detection (fast access)
+    raw_xml:      str    # full original XML — parsed on demand for the details panel
     # enriched from event_db
     name:  str
     cat:   str
@@ -136,6 +137,7 @@ def _parse_xml(xml_str: str) -> ParsedEvent | None:
         logon_type=logon_type,
         auth_package=auth_package,
         raw_fields=raw_fields,
+        raw_xml=xml_str,         # stored for full on-demand field display
         name=info["name"],
         cat=info["cat"],
         sev=info["sev"],
