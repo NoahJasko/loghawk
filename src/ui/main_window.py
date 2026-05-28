@@ -10,6 +10,7 @@ from pathlib import Path
 from PySide6.QtCore import (
     QAbstractTableModel,
     QModelIndex,
+    QPoint,
     QSortFilterProxyModel,
     Qt,
     QThread,
@@ -27,11 +28,13 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QScrollArea,
     QSizePolicy,
     QSplitter,
+    QStackedWidget,
     QStatusBar,
     QTabWidget,
     QTableView,
@@ -402,6 +405,111 @@ def _all_fields_from_event(ev: ParsedEvent) -> dict[str, str]:
     return dict(ev.raw_fields)
 
 
+# ── Statistics HTML builder ───────────────────────────────────────────────────
+
+def _build_stats_html(events: list[ParsedEvent]) -> str:
+    import html as _h
+    from collections import Counter
+
+    if not events:
+        return (
+            "<body style='background:#1e1e2e;color:#6c7086;font-family:Segoe UI;"
+            "padding:40px;text-align:center'>Load a file to see statistics.</body>"
+        )
+
+    total = len(events)
+    timestamps = [e.timestamp for e in events if e.timestamp]
+    if timestamps:
+        date_range = (
+            f"{min(timestamps).strftime('%Y-%m-%d %H:%M')}"
+            f" → {max(timestamps).strftime('%Y-%m-%d %H:%M')}"
+        )
+    else:
+        date_range = "—"
+
+    sev_counts   = Counter(e.sev for e in events)
+    id_counts    = Counter((e.event_id, e.name) for e in events)
+    top_ids      = id_counts.most_common(10)
+
+    _SKIP_USERS = {"-", "SYSTEM", "LOCAL SERVICE", "NETWORK SERVICE", ""}
+    user_counts  = Counter(
+        e.user for e in events
+        if e.user not in _SKIP_USERS and not e.user.endswith("$")
+    )
+    top_users = user_counts.most_common(5)
+
+    _SKIP_IPS = {"-", "::1", "127.0.0.1", ""}
+    ip_counts = Counter(e.source_ip for e in events if e.source_ip not in _SKIP_IPS)
+    top_ips   = ip_counts.most_common(5)
+
+    hour_counts: Counter = Counter()
+    for e in events:
+        if e.timestamp:
+            hour_counts[e.timestamp.strftime("%Y-%m-%d %H:00")] += 1
+    sorted_hours = sorted(hour_counts.items())[-24:]
+
+    _SEV_COLORS = {
+        "critical": "#f38ba8", "high": "#fab387",
+        "medium": "#f9e2af",   "low":  "#89b4fa", "info": "#6c7086",
+    }
+
+    def bar_row(label: str, count: int, max_count: int, color: str = "#7c3aed") -> str:
+        pct  = int(count / max(max_count, 1) * 100)
+        lbl  = _h.escape(str(label))
+        return (
+            f"<tr>"
+            f"<td style='color:#a6adc8;font-size:8pt;padding:2px 8px 2px 0;"
+            f"white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis'>{lbl}</td>"
+            f"<td style='width:100%'><div style='background:#313244;border-radius:3px;height:14px'>"
+            f"<div style='background:{color};border-radius:3px;height:14px;"
+            f"width:{pct}%;min-width:2px'></div></div></td>"
+            f"<td style='color:#6c7086;font-size:8pt;padding:2px 0 2px 8px;"
+            f"white-space:nowrap;text-align:right'>{count:,}</td>"
+            f"</tr>"
+        )
+
+    def section(title: str) -> str:
+        return (
+            f"<h3 style='color:#a6adc8;font-size:8pt;text-transform:uppercase;"
+            f"letter-spacing:1px;margin:20px 0 8px 0;border-bottom:1px solid #313244;"
+            f"padding-bottom:4px'>{title}</h3>"
+        )
+
+    sev_pills = " ".join(
+        f"<span style='color:{_SEV_COLORS[s]};border:1px solid {_SEV_COLORS[s]};"
+        f"border-radius:4px;padding:2px 8px;margin-right:4px;font-size:8pt;"
+        f"font-weight:bold'>{sev_counts[s]:,} {s.upper()}</span>"
+        for s in ("critical", "high", "medium", "low", "info")
+        if sev_counts.get(s)
+    )
+
+    def table(rows_html: str) -> str:
+        return f"<table width='100%' cellspacing='0' cellpadding='0'>{rows_html}</table>"
+
+    max_id   = top_ids[0][1]   if top_ids   else 1
+    max_usr  = top_users[0][1] if top_users else 1
+    max_ip   = top_ips[0][1]   if top_ips   else 1
+    max_hr   = max((c for _, c in sorted_hours), default=1)
+
+    id_rows  = "".join(bar_row(f"{eid}  {ename}", cnt, max_id)             for (eid, ename), cnt in top_ids)
+    usr_rows = "".join(bar_row(u, c, max_usr, "#89b4fa")                   for u, c in top_users)   or bar_row("—", 0, 1, "#89b4fa")
+    ip_rows  = "".join(bar_row(ip, c, max_ip, "#a6e3a1")                   for ip, c in top_ips)    or bar_row("—", 0, 1, "#a6e3a1")
+    hr_rows  = "".join(bar_row(h[-5:], c, max_hr, "#cba6f7")               for h, c in sorted_hours)
+
+    return (
+        "<!DOCTYPE html><html><body style='background:#1e1e2e;color:#cdd6f4;"
+        "font-family:\"Segoe UI\",sans-serif;margin:12px;font-size:9pt'>"
+        f"<div style='color:#6c7086;font-size:8pt;margin-bottom:8px'>"
+        f"{total:,} events &nbsp;·&nbsp; {_h.escape(date_range)}</div>"
+        f"<div style='margin-bottom:12px'>{sev_pills}</div>"
+        f"{section('Top 10 Event IDs')}{table(id_rows)}"
+        f"{section('Top 5 Users')}{table(usr_rows)}"
+        f"{section('Top 5 Source IPs')}{table(ip_rows)}"
+        f"{section('Events per Hour (last 24)')}{table(hr_rows)}"
+        "</body></html>"
+    )
+
+
 # ── Main Window ───────────────────────────────────────────────────────────────
 
 class MainWindow(QMainWindow):
@@ -506,9 +614,36 @@ class MainWindow(QMainWindow):
         self._progress.setVisible(False)
         tb.addWidget(self._progress)
 
+        # ── Empty state ───────────────────────────────────────────────────
+        empty_widget = QWidget()
+        ev_lay = QVBoxLayout(empty_widget)
+        ev_lay.setAlignment(Qt.AlignCenter)
+        ev_lay.setSpacing(12)
+        title_lbl = QLabel("LogHawk")
+        title_lbl.setAlignment(Qt.AlignCenter)
+        title_lbl.setStyleSheet(
+            "font-size: 28pt; font-weight: bold; color: #7c3aed; background: transparent;"
+        )
+        hint_lbl = QLabel(
+            "Open a Windows Security Event Log to get started.\n\n"
+            "  File → Open EVTX File   (.evtx — Windows only)\n"
+            "  File → Open CSV File      (exported from Event Viewer)"
+        )
+        hint_lbl.setAlignment(Qt.AlignCenter)
+        hint_lbl.setStyleSheet(
+            "font-size: 10pt; color: #6c7086; background: transparent; line-height: 1.8;"
+        )
+        ev_lay.addWidget(title_lbl)
+        ev_lay.addWidget(hint_lbl)
+
         # ── Central splitter ──────────────────────────────────────────────
-        splitter = QSplitter(Qt.Vertical, self)
-        self.setCentralWidget(splitter)
+        splitter = QSplitter(Qt.Vertical)
+
+        # Stack: 0 = empty state, 1 = events splitter
+        self._stack = QStackedWidget()
+        self._stack.addWidget(empty_widget)
+        self._stack.addWidget(splitter)
+        self.setCentralWidget(self._stack)
 
         # Events table
         self._model = EventTableModel()
@@ -529,17 +664,22 @@ class MainWindow(QMainWindow):
         for i, w in enumerate(_COL_W):
             self._table.setColumnWidth(i, w)
         self._table.selectionModel().currentRowChanged.connect(self._on_row_selected)
+        self._table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._table.customContextMenuRequested.connect(self._on_table_context_menu)
         splitter.addWidget(self._table)
 
         # Details panel (tab widget)
         self._detail_tabs = QTabWidget()
-        self._detail_tabs.setFixedHeight(210)
+        self._detail_tabs.setFixedHeight(230)
         self._detail_summary = QTextBrowser()
         self._detail_summary.setOpenExternalLinks(False)
         self._detail_raw = QTextBrowser()
         self._detail_raw.setFont(QFont("Cascadia Code, Consolas", 9))
+        self._detail_stats = QTextBrowser()
+        self._detail_stats.setOpenExternalLinks(False)
         self._detail_tabs.addTab(self._detail_summary, "Event Details")
         self._detail_tabs.addTab(self._detail_raw,     "Raw Fields")
+        self._detail_tabs.addTab(self._detail_stats,   "Statistics")
         splitter.addWidget(self._detail_tabs)
         splitter.setStretchFactor(0, 4)
         splitter.setStretchFactor(1, 1)
@@ -587,12 +727,13 @@ class MainWindow(QMainWindow):
         mb = self.menuBar()
 
         fm = mb.addMenu("File")
-        fm.addAction("Open EVTX File…",  self._open_evtx,  QKeySequence("Ctrl+O"))
-        fm.addAction("Open CSV File…",   self._open_csv,   QKeySequence("Ctrl+Shift+O"))
+        fm.addAction("Open EVTX File…",         self._open_evtx,                QKeySequence("Ctrl+O"))
+        fm.addAction("Open CSV File…",          self._open_csv,                 QKeySequence("Ctrl+Shift+O"))
         fm.addSeparator()
-        fm.addAction("Export CSV…",      self._export_csv, QKeySequence("Ctrl+E"))
+        fm.addAction("Export Events CSV…",      self._export_csv,               QKeySequence("Ctrl+E"))
+        fm.addAction("Export Detection Report…",self._export_detection_report,  QKeySequence("Ctrl+Shift+E"))
         fm.addSeparator()
-        fm.addAction("Exit",             self.close,       QKeySequence("Alt+F4"))
+        fm.addAction("Exit",                    self.close,                     QKeySequence("Alt+F4"))
 
         vm = mb.addMenu("View")
         vm.addAction("Clear Events",     self._clear_events)
@@ -656,6 +797,8 @@ class MainWindow(QMainWindow):
         self._progress.setValue(100)
         self._load_label.setText(f"Done  —  {total:,} events  |  Running detections…")
         self.setWindowTitle(f"LogHawk — {total:,} events loaded")
+        self._stack.setCurrentIndex(1)   # show events view
+        self._update_stats()
         self._update_status()
 
         # Run detection in the background — never blocks the UI
@@ -856,6 +999,131 @@ class MainWindow(QMainWindow):
             f"Exported {len(visible_events):,} events to:\n{path}"
         )
 
+    # ── Right-click context menu ─────────────────────────────────────────────
+    def _on_table_context_menu(self, pos: QPoint) -> None:
+        idx = self._table.indexAt(pos)
+        if not idx.isValid():
+            return
+        src_idx = self._proxy.mapToSource(idx)
+        ev: ParsedEvent = self._model._events[src_idx.row()]
+
+        menu = QMenu(self)
+
+        if ev.user and ev.user not in ("-", ""):
+            menu.addAction(
+                f"Filter by User:  {ev.user}",
+                lambda u=ev.user: self._search_box.setText(u),
+            )
+        if ev.source_ip and ev.source_ip not in ("-", ""):
+            menu.addAction(
+                f"Filter by IP:  {ev.source_ip}",
+                lambda ip=ev.source_ip: self._search_box.setText(ip),
+            )
+        menu.addAction(
+            f"Filter by Event ID:  {ev.event_id}",
+            lambda eid=str(ev.event_id): self._search_box.setText(eid),
+        )
+        menu.addSeparator()
+        menu.addAction("Copy Row", lambda e=ev: self._copy_event_row(e))
+        menu.addSeparator()
+        menu.addAction("Clear Filter", self._search_box.clear)
+
+        menu.exec(self._table.viewport().mapToGlobal(pos))
+
+    def _copy_event_row(self, ev: ParsedEvent) -> None:
+        ts = ev.timestamp.strftime("%Y-%m-%d %H:%M:%S") if ev.timestamp else "—"
+        QApplication.clipboard().setText(
+            f"{ts}\t{ev.event_id}\t{ev.name}\t{ev.sev.upper()}\t"
+            f"{ev.user}\t{ev.computer}\t{ev.source_ip}"
+        )
+
+    # ── Statistics ────────────────────────────────────────────────────────────
+    def _update_stats(self) -> None:
+        self._detail_stats.setHtml(_build_stats_html(self._events))
+
+    # ── Export detection report ───────────────────────────────────────────────
+    def _export_detection_report(self) -> None:
+        if not self._detections:
+            QMessageBox.information(self, "Export", "No detections to export.\nLoad a file first.")
+            return
+        path, sel = QFileDialog.getSaveFileName(
+            self, "Export Detection Report",
+            "loghawk_detections.html",
+            "HTML Report (*.html);;CSV (*.csv)",
+        )
+        if not path:
+            return
+        if path.lower().endswith(".csv"):
+            self._export_detections_csv(path)
+        else:
+            self._export_detections_html(path)
+
+    def _export_detections_csv(self, path: str) -> None:
+        fields = ["rule_id", "name", "severity", "timestamp", "source",
+                  "target", "mitre", "summary", "event_count"]
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
+            for d in self._detections:
+                ts = d.timestamp.strftime("%Y-%m-%d %H:%M:%S") if d.timestamp else ""
+                w.writerow({
+                    "rule_id":     d.rule_id,
+                    "name":        d.name,
+                    "severity":    d.severity,
+                    "timestamp":   ts,
+                    "source":      d.source,
+                    "target":      d.target,
+                    "mitre":       "; ".join(d.mitre),
+                    "summary":     d.summary,
+                    "event_count": len(d.events),
+                })
+        QMessageBox.information(self, "Export Complete", f"Detection report saved to:\n{path}")
+
+    def _export_detections_html(self, path: str) -> None:
+        import html as _h
+        _C = {"critical":"#f38ba8","high":"#fab387","medium":"#f9e2af","low":"#89b4fa","info":"#6c7086"}
+        rows = ""
+        for d in self._detections:
+            ts   = d.timestamp.strftime("%Y-%m-%d %H:%M:%S") if d.timestamp else "—"
+            col  = _C.get(d.severity, "#cdd6f4")
+            mit  = " ".join(
+                f"<span style='color:#7c3aed;border:1px solid #7c3aed;border-radius:3px;"
+                f"padding:1px 5px;font-size:11px'>{m}</span>"
+                for m in d.mitre
+            )
+            rows += (
+                f"<tr>"
+                f"<td style='color:{col};font-weight:bold;white-space:nowrap'>{d.severity.upper()}</td>"
+                f"<td style='color:#6c7086;white-space:nowrap'>{d.rule_id}</td>"
+                f"<td style='font-weight:bold'>{_h.escape(d.name)}</td>"
+                f"<td style='color:#a6adc8'>{_h.escape(d.summary)}</td>"
+                f"<td style='color:#6c7086;white-space:nowrap'>{ts}</td>"
+                f"<td>{mit}</td>"
+                f"<td style='color:#6c7086;white-space:nowrap'>{_h.escape(d.source)}</td>"
+                f"</tr>"
+            )
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        content = (
+            "<!DOCTYPE html><html><head><style>"
+            "body{background:#1a1b2e;color:#cdd6f4;font-family:'Segoe UI',sans-serif;padding:24px}"
+            "h1{color:#7c3aed;margin-bottom:4px}"
+            "p{color:#6c7086;font-size:13px;margin-top:0}"
+            "table{width:100%;border-collapse:collapse;margin-top:16px}"
+            "th{background:#181825;color:#a6adc8;text-align:left;padding:8px 12px;"
+            "font-size:11px;text-transform:uppercase;letter-spacing:0.5px}"
+            "td{padding:8px 12px;border-bottom:1px solid #313244;vertical-align:top;font-size:13px}"
+            "tr:hover{background:#2a2a3d}"
+            "</style></head><body>"
+            f"<h1>LogHawk — Detection Report</h1>"
+            f"<p>Generated: {now} &nbsp;·&nbsp; {len(self._detections)} detections</p>"
+            "<table><tr><th>Severity</th><th>Rule</th><th>Detection</th>"
+            "<th>Summary</th><th>Time</th><th>MITRE</th><th>Source</th></tr>"
+            f"{rows}</table></body></html>"
+        )
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        QMessageBox.information(self, "Export Complete", f"Detection report saved to:\n{path}")
+
     # ── Misc ─────────────────────────────────────────────────────────────────
     def _clear_events(self) -> None:
         self._model.clear()
@@ -863,6 +1131,8 @@ class MainWindow(QMainWindow):
         self._clear_detections()
         self._detail_summary.clear()
         self._detail_raw.clear()
+        self._detail_stats.setHtml("")
+        self._stack.setCurrentIndex(0)   # back to empty state
         self.setWindowTitle("LogHawk — Security Event Log Analyzer")
         self._update_status()
 
