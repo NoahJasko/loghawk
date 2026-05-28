@@ -1,0 +1,80 @@
+name: Build LogHawk Windows EXE
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # pywin32 post-install script registers DLLs — required on CI
+      - name: Post-install pywin32
+        run: python -m pywin32_postinstall -install
+        continue-on-error: true
+
+      - name: Build with PyInstaller
+        run: pyinstaller build.spec --clean --noconfirm
+
+      - name: Verify output
+        run: |
+          if (Test-Path "dist/LogHawk.exe") {
+            Write-Host "Build succeeded — LogHawk.exe present"
+            (Get-Item "dist/LogHawk.exe").Length / 1MB
+          } else {
+            Write-Error "LogHawk.exe not found in dist/"
+            exit 1
+          }
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogHawk-Windows
+          path: dist/LogHawk.exe
+          retention-days: 30
+
+      # Only create a GitHub Release when triggered by a version tag
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: LogHawk ${{ github.ref_name }}
+          body: |
+            ## LogHawk ${{ github.ref_name }}
+
+            ### Download
+            | File | Platform |
+            |---|---|
+            | `LogHawk.exe` | Windows 10/11 x64 |
+
+            ### What's new
+            See [CHANGELOG](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
+
+            ### Usage
+            1. Download `LogHawk.exe`
+            2. Double-click — no install required
+            3. File → Open EVTX File or Open CSV File
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: dist/LogHawk.exe

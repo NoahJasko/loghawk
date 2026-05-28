@@ -1,0 +1,1143 @@
+{
+  "1100": {
+    "name": "Event Logging Service Shut Down",
+    "cat": "system",
+    "sev": "medium",
+    "desc": "The event logging service was shut down. May indicate system shutdown or deliberate service termination to suppress audit logging.",
+    "mitre": []
+  },
+  "1101": {
+    "name": "Audit Events Dropped",
+    "cat": "system",
+    "sev": "high",
+    "desc": "Audit events were dropped due to a full event queue. This can cause evidence loss during an attack and may be intentionally triggered by flooding the audit pipeline.",
+    "mitre": ["T1562.002"]
+  },
+  "1102": {
+    "name": "Audit Log Cleared",
+    "cat": "system",
+    "sev": "critical",
+    "desc": "The Security Event Log was cleared. This is almost always an indicator of compromise or deliberate anti-forensics. Investigate the account that cleared the log and all activity immediately prior.",
+    "mitre": ["T1070.001"]
+  },
+  "1104": {
+    "name": "Security Log Full",
+    "cat": "system",
+    "sev": "high",
+    "desc": "The Security event log is full and new events cannot be written. Event loss may follow. An attacker may intentionally flood the log to trigger this condition and suppress further audit records.",
+    "mitre": ["T1562.002"]
+  },
+  "1105": {
+    "name": "Automatic Backup of Audit Log",
+    "cat": "system",
+    "sev": "info",
+    "desc": "The audit log was automatically backed up because it reached maximum size. Review the backup policy to ensure retention meets compliance requirements.",
+    "mitre": []
+  },
+  "1108": {
+    "name": "Audit Event Processing Failure",
+    "cat": "system",
+    "sev": "medium",
+    "desc": "The security event subsystem encountered an error processing an audit event. Repeated failures may indicate a misconfigured or compromised audit pipeline.",
+    "mitre": []
+  },
+  "4608": {
+    "name": "Windows Starting Up",
+    "cat": "system",
+    "sev": "info",
+    "desc": "The Windows operating system is starting up. Useful as a timeline anchor to correlate with subsequent logon and process events.",
+    "mitre": []
+  },
+  "4609": {
+    "name": "Windows Shutting Down",
+    "cat": "system",
+    "sev": "info",
+    "desc": "The Windows operating system is shutting down. Combined with unexpected 4608 events, may indicate unauthorized reboots.",
+    "mitre": []
+  },
+  "4610": {
+    "name": "Authentication Package Loaded",
+    "cat": "system",
+    "sev": "medium",
+    "desc": "An authentication package was loaded by the Local Security Authority. Malicious authentication packages can be used to intercept credentials and maintain persistence inside LSASS.",
+    "mitre": ["T1547.002"]
+  },
+  "4611": {
+    "name": "Trusted Logon Process Registered",
+    "cat": "system",
+    "sev": "medium",
+    "desc": "A trusted logon process has been registered with the Local Security Authority. Unauthorized registration may indicate an attempt to intercept credentials.",
+    "mitre": []
+  },
+  "4612": {
+    "name": "Internal Resources Allocated for Queuing of Audit Messages Exhausted",
+    "cat": "system",
+    "sev": "medium",
+    "desc": "Internal audit message queuing resources were exhausted. Some audit messages may have been discarded, creating potential blind spots.",
+    "mitre": []
+  },
+  "4614": {
+    "name": "Notification Package Loaded",
+    "cat": "system",
+    "sev": "medium",
+    "desc": "A notification package was loaded into the Local Security Authority. Malicious notification packages (password filter DLLs) are used to capture plaintext passwords during password changes.",
+    "mitre": ["T1547.008"]
+  },
+  "4615": {
+    "name": "Invalid Use of LPC Port",
+    "cat": "system",
+    "sev": "medium",
+    "desc": "A process made an invalid use of an LPC port. May indicate exploitation of privilege escalation or sandbox escape vulnerabilities.",
+    "mitre": []
+  },
+  "4616": {
+    "name": "System Time Changed",
+    "cat": "system",
+    "sev": "high",
+    "desc": "The system clock was changed. Time manipulation can be used for anti-forensics (confusing log timelines), bypassing time-based access controls, or Kerberos ticket attacks. Investigate who changed it and to what value.",
+    "mitre": ["T1070.006"]
+  },
+  "4618": {
+    "name": "Monitored Security Event Pattern Occurred",
+    "cat": "system",
+    "sev": "high",
+    "desc": "A monitored security event pattern was detected. This event fires when a pre-configured audit pattern matches, suggesting a condition that security staff have flagged as noteworthy.",
+    "mitre": []
+  },
+  "4621": {
+    "name": "Administrator Recovered System from CrashOnAuditFail",
+    "cat": "system",
+    "sev": "high",
+    "desc": "An administrator recovered the system from CrashOnAuditFail. The system was configured to crash if audit logging failed, and this event indicates recovery from that condition. Review surrounding events for evidence of audit suppression.",
+    "mitre": ["T1562.002"]
+  },
+  "4622": {
+    "name": "Security Package Loaded",
+    "cat": "system",
+    "sev": "medium",
+    "desc": "A security package was loaded into the Local Security Authority. Malicious SSPs (Security Support Providers) can intercept authentication credentials and persist as LSASS modules.",
+    "mitre": ["T1547.005"]
+  },
+  "4624": {
+    "name": "Account Successfully Logged On",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "A user account successfully logged on. Review LogonType: 2=Interactive, 3=Network, 4=Batch, 5=Service, 7=Unlock, 9=NewCredentials (runas), 10=RemoteInteractive (RDP), 11=CachedInteractive. Network logons (type 3) with NTLM auth may indicate Pass-the-Hash.",
+    "mitre": ["T1078"]
+  },
+  "4625": {
+    "name": "Account Failed to Log On",
+    "cat": "logon",
+    "sev": "medium",
+    "desc": "A user account failed to log on. Repeated failures from the same source indicate brute-force or password spraying. Status codes: 0xC000006A=wrong password, 0xC0000064=unknown username, 0xC000006F=outside allowed hours, 0xC0000070=workstation restriction, 0xC0000072=account disabled, 0xC000006D=general failure.",
+    "mitre": ["T1110"]
+  },
+  "4626": {
+    "name": "User/Device Claims Information",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "User or device claims information was returned during authentication. Part of Dynamic Access Control; provides context for policy decisions.",
+    "mitre": []
+  },
+  "4627": {
+    "name": "Group Membership Information",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "Group membership information for the logging-on user. Unexpected group memberships may indicate privilege escalation or unauthorized account changes.",
+    "mitre": []
+  },
+  "4634": {
+    "name": "Account Was Logged Off",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "A user account was logged off. Session duration can be calculated by pairing with the corresponding 4624 event. Very short sessions may indicate automated attacks.",
+    "mitre": []
+  },
+  "4647": {
+    "name": "User Initiated Logoff",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "A user initiated a logoff. For interactive sessions, this event precedes 4634. Useful for establishing accurate session durations.",
+    "mitre": []
+  },
+  "4648": {
+    "name": "Logon Attempted Using Explicit Credentials",
+    "cat": "logon",
+    "sev": "high",
+    "desc": "A process attempted to log on using explicit credentials (e.g., runas, schtasks, net use). Commonly seen in Pass-the-Hash and lateral movement scenarios. Investigate when the target differs from the current user's context, especially with NTLM authentication.",
+    "mitre": ["T1550.002", "T1021.002"]
+  },
+  "4649": {
+    "name": "Replay Attack Detected",
+    "cat": "logon",
+    "sev": "critical",
+    "desc": "A replay attack was detected. A Kerberos request was received twice, indicating a man-in-the-middle or replay attack in progress. Investigate immediately.",
+    "mitre": ["T1558"]
+  },
+  "4672": {
+    "name": "Special Privileges Assigned to New Logon",
+    "cat": "privilege",
+    "sev": "medium",
+    "desc": "Special privileges (e.g., SeDebugPrivilege, SeTcbPrivilege, SeImpersonatePrivilege) were assigned to a new logon. Review the specific privileges granted; sensitive privileges are frequently abused for privilege escalation and credential dumping.",
+    "mitre": ["T1134"]
+  },
+  "4673": {
+    "name": "Privileged Service Called",
+    "cat": "privilege",
+    "sev": "low",
+    "desc": "A privileged service was called. Review the privilege name and calling process to determine if the access was expected.",
+    "mitre": []
+  },
+  "4674": {
+    "name": "Operation Attempted on Privileged Object",
+    "cat": "privilege",
+    "sev": "low",
+    "desc": "An operation was attempted on a privileged object. Repeated failed attempts may indicate exploitation attempts.",
+    "mitre": []
+  },
+  "4675": {
+    "name": "SIDs Were Filtered",
+    "cat": "logon",
+    "sev": "medium",
+    "desc": "SIDs were filtered during an authentication. May indicate cross-domain trust exploitation or SID history injection attempts.",
+    "mitre": ["T1134.005"]
+  },
+  "4688": {
+    "name": "New Process Created",
+    "cat": "process",
+    "sev": "low",
+    "desc": "A new process was created. With command-line auditing enabled, this reveals the exact arguments used. Watch for living-off-the-land binaries (LOLBins), encoded PowerShell, process injection, and suspicious parent-child relationships (e.g., Word spawning cmd.exe).",
+    "mitre": ["T1059", "T1218"]
+  },
+  "4689": {
+    "name": "Process Terminated",
+    "cat": "process",
+    "sev": "info",
+    "desc": "A process was terminated. Pair with 4688 to calculate process lifetime. Very short-lived processes may indicate malicious payloads that clean up after execution.",
+    "mitre": []
+  },
+  "4696": {
+    "name": "Primary Token Assigned to Process",
+    "cat": "process",
+    "sev": "low",
+    "desc": "A primary token was assigned to a process. Used for tracking token assignment during process creation.",
+    "mitre": []
+  },
+  "4697": {
+    "name": "Service Installed in the System",
+    "cat": "service",
+    "sev": "high",
+    "desc": "A new service was installed. Attackers frequently install malicious services for persistence and privilege escalation. Review the service binary path, startup type, and the account that installed it. Remote service installation is a common lateral movement technique.",
+    "mitre": ["T1543.003"]
+  },
+  "4698": {
+    "name": "Scheduled Task Created",
+    "cat": "process",
+    "sev": "high",
+    "desc": "A new scheduled task was created. Scheduled tasks are heavily abused for persistence, privilege escalation, and lateral movement. Review the task action (command/script), trigger, and the account that created it. Base64-encoded commands in task actions are highly suspicious.",
+    "mitre": ["T1053.005"]
+  },
+  "4699": {
+    "name": "Scheduled Task Deleted",
+    "cat": "process",
+    "sev": "medium",
+    "desc": "A scheduled task was deleted. Deletion of tasks shortly after creation may indicate cleanup of a persistence mechanism or execution-only tasks used during attacks.",
+    "mitre": ["T1053.005", "T1070"]
+  },
+  "4700": {
+    "name": "Scheduled Task Enabled",
+    "cat": "process",
+    "sev": "medium",
+    "desc": "A previously disabled scheduled task was enabled. Could indicate reactivation of a persistence mechanism.",
+    "mitre": ["T1053.005"]
+  },
+  "4701": {
+    "name": "Scheduled Task Disabled",
+    "cat": "process",
+    "sev": "low",
+    "desc": "A scheduled task was disabled. May indicate tampering with legitimate scheduled security or maintenance tasks.",
+    "mitre": []
+  },
+  "4702": {
+    "name": "Scheduled Task Updated",
+    "cat": "process",
+    "sev": "medium",
+    "desc": "A scheduled task was updated. Modifications to existing tasks may indicate an attacker hijacking a legitimate scheduled task for persistence.",
+    "mitre": ["T1053.005"]
+  },
+  "4703": {
+    "name": "Token Right Adjusted",
+    "cat": "privilege",
+    "sev": "medium",
+    "desc": "A user right (privilege) was adjusted for a process token. Privilege adjustment at runtime may indicate token manipulation or privilege escalation.",
+    "mitre": ["T1134"]
+  },
+  "4704": {
+    "name": "User Right Assigned",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "A user right was assigned. Granting sensitive privileges (e.g., SeDebugPrivilege, SeTcbPrivilege) to unexpected accounts is a strong indicator of privilege escalation.",
+    "mitre": ["T1098"]
+  },
+  "4705": {
+    "name": "User Right Removed",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "A user right was removed. Removing rights from accounts may be part of a defense evasion strategy or disabling security monitoring processes.",
+    "mitre": []
+  },
+  "4706": {
+    "name": "New Trust Created to a Domain",
+    "cat": "policy",
+    "sev": "high",
+    "desc": "A new domain trust was created. Unauthorized trust creation can be used to allow access from a foreign domain or enable SID history injection across trust boundaries.",
+    "mitre": ["T1484.002"]
+  },
+  "4707": {
+    "name": "Trust to a Domain Removed",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "A domain trust was removed. Unexpected trust removal could disrupt business operations or be part of a takeover scenario.",
+    "mitre": []
+  },
+  "4713": {
+    "name": "Kerberos Policy Changed",
+    "cat": "kerberos",
+    "sev": "high",
+    "desc": "Kerberos policy settings were changed. Modifications to ticket lifetime or renewal settings may be made to support Golden or Silver Ticket attacks.",
+    "mitre": ["T1558.001"]
+  },
+  "4715": {
+    "name": "Audit Policy Changed on Object",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "The audit policy on an object was changed. Disabling auditing on sensitive objects is a common defense evasion tactic.",
+    "mitre": ["T1562.001"]
+  },
+  "4716": {
+    "name": "Trusted Domain Information Modified",
+    "cat": "policy",
+    "sev": "high",
+    "desc": "Trusted domain information was modified. Changes to trust attributes can affect the scope of a compromised domain and enable cross-domain attacks.",
+    "mitre": ["T1484.002"]
+  },
+  "4717": {
+    "name": "System Security Access Granted",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "System security access (logon rights) was granted to an account. Review which rights were granted and to whom.",
+    "mitre": []
+  },
+  "4718": {
+    "name": "System Security Access Removed",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "System security access (logon rights) was removed from an account. May indicate privilege stripping as part of a takeover.",
+    "mitre": []
+  },
+  "4719": {
+    "name": "System Audit Policy Changed",
+    "cat": "policy",
+    "sev": "high",
+    "desc": "The system audit policy was changed. Attackers may reduce audit coverage to operate undetected. Unexpected changes to audit policy warrant immediate investigation.",
+    "mitre": ["T1562.002"]
+  },
+  "4720": {
+    "name": "User Account Created",
+    "cat": "account",
+    "sev": "high",
+    "desc": "A new user account was created. Attackers create accounts for persistence and lateral movement. Review the creating account, the new account name, and whether it was subsequently added to privileged groups.",
+    "mitre": ["T1136.001", "T1136.002"]
+  },
+  "4722": {
+    "name": "User Account Enabled",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A user account was enabled. Re-enabling dormant or disabled accounts may indicate an attacker activating a backdoor or previously compromised account.",
+    "mitre": ["T1098"]
+  },
+  "4723": {
+    "name": "Attempt Made to Change Account Password",
+    "cat": "account",
+    "sev": "low",
+    "desc": "An attempt was made to change a user account's password. Track for unauthorized self-service password changes or changes to privileged accounts.",
+    "mitre": []
+  },
+  "4724": {
+    "name": "Attempt Made to Reset Account Password",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "An attempt was made to reset a user account's password by an administrator. Unauthorized password resets on privileged accounts indicate account takeover.",
+    "mitre": ["T1098"]
+  },
+  "4725": {
+    "name": "User Account Disabled",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A user account was disabled. Unexpected disabling of accounts, particularly service accounts or admin accounts, may indicate sabotage.",
+    "mitre": []
+  },
+  "4726": {
+    "name": "User Account Deleted",
+    "cat": "account",
+    "sev": "high",
+    "desc": "A user account was deleted. Deletion of accounts can be used to cover tracks after a breach or sabotage legitimate user access.",
+    "mitre": ["T1070"]
+  },
+  "4727": {
+    "name": "Security-Enabled Global Group Created",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A new security-enabled global group was created. Attackers may create groups to aggregate permissions or establish persistent access structures.",
+    "mitre": ["T1136"]
+  },
+  "4728": {
+    "name": "Member Added to Security-Enabled Global Group",
+    "cat": "account",
+    "sev": "high",
+    "desc": "A member was added to a security-enabled global group. Adding users to Domain Admins, Enterprise Admins, or Schema Admins is critical to detect immediately.",
+    "mitre": ["T1098.007"]
+  },
+  "4729": {
+    "name": "Member Removed from Security-Enabled Global Group",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A member was removed from a security-enabled global group. Unexpected removals from security groups may indicate sabotage or cleanup of temporary elevated access.",
+    "mitre": []
+  },
+  "4730": {
+    "name": "Security-Enabled Global Group Deleted",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A security-enabled global group was deleted. Deletion of security groups can disable access controls and remove evidence of group membership.",
+    "mitre": []
+  },
+  "4731": {
+    "name": "Security-Enabled Local Group Created",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A new security-enabled local group was created. Review whether this aligns with expected administrative activity.",
+    "mitre": ["T1136"]
+  },
+  "4732": {
+    "name": "Member Added to Security-Enabled Local Group",
+    "cat": "account",
+    "sev": "high",
+    "desc": "A member was added to a security-enabled local group. Watch for additions to Administrators, Remote Desktop Users, or Remote Management Users groups — common persistence techniques.",
+    "mitre": ["T1098.007"]
+  },
+  "4733": {
+    "name": "Member Removed from Security-Enabled Local Group",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A member was removed from a security-enabled local group.",
+    "mitre": []
+  },
+  "4734": {
+    "name": "Security-Enabled Local Group Deleted",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A security-enabled local group was deleted.",
+    "mitre": []
+  },
+  "4735": {
+    "name": "Security-Enabled Local Group Changed",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A security-enabled local group's attributes were changed. Review changes to group description, scope, or membership.",
+    "mitre": []
+  },
+  "4737": {
+    "name": "Security-Enabled Global Group Changed",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A security-enabled global group's attributes were changed.",
+    "mitre": []
+  },
+  "4738": {
+    "name": "User Account Changed",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A user account's attributes were changed. Watch for UAC flag changes (e.g., disabling password required, enabling Don't Expire Password, disabling Kerberos pre-authentication — the last enables AS-REP roasting).",
+    "mitre": ["T1098", "T1558.004"]
+  },
+  "4740": {
+    "name": "User Account Locked Out",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A user account was locked out due to too many failed logon attempts. Review the caller computer to identify the source. Multiple lockouts across many accounts from the same source indicates password spraying.",
+    "mitre": ["T1110.003"]
+  },
+  "4741": {
+    "name": "Computer Account Created",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A new computer account was created in Active Directory. Unauthorized machine account creation may support Kerberos Resource-Based Constrained Delegation (RBCD) attacks.",
+    "mitre": ["T1136.002"]
+  },
+  "4742": {
+    "name": "Computer Account Changed",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A computer account was changed. Modifications to the msDS-AllowedToActOnBehalfOfOtherIdentity attribute enable Resource-Based Constrained Delegation abuse.",
+    "mitre": ["T1098"]
+  },
+  "4743": {
+    "name": "Computer Account Deleted",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A computer account was deleted from Active Directory.",
+    "mitre": []
+  },
+  "4756": {
+    "name": "Member Added to Security-Enabled Universal Group",
+    "cat": "account",
+    "sev": "high",
+    "desc": "A member was added to a security-enabled universal group. Universal groups span forests and can have broad scope. Watch for additions to Enterprise Admins.",
+    "mitre": ["T1098.007"]
+  },
+  "4765": {
+    "name": "SID History Added to an Account",
+    "cat": "account",
+    "sev": "critical",
+    "desc": "SID History was added to an account. Adding Domain Admins or Enterprise Admins SIDs to a low-privilege account via SID History injection grants implicit domain admin rights. This is a well-known Active Directory persistence and privilege escalation technique.",
+    "mitre": ["T1134.005"]
+  },
+  "4766": {
+    "name": "Attempt to Add SID History Failed",
+    "cat": "account",
+    "sev": "high",
+    "desc": "An attempt to add SID History to an account failed. Even a failed attempt indicates the SID History injection technique is being attempted against Active Directory.",
+    "mitre": ["T1134.005"]
+  },
+  "4767": {
+    "name": "User Account Unlocked",
+    "cat": "account",
+    "sev": "low",
+    "desc": "A user account was unlocked. Correlate with preceding lockout events to understand the lockout cause.",
+    "mitre": []
+  },
+  "4768": {
+    "name": "Kerberos Authentication Ticket Requested (TGT)",
+    "cat": "kerberos",
+    "sev": "low",
+    "desc": "A Kerberos authentication ticket (TGT) was requested. Baseline TGT requests for normal users. Requests for disabled accounts (Result: 0x12) or with pre-auth disabled (PreAuthType: 0) indicate AS-REP Roasting targets. Unusual encryption types (0x17=RC4) may indicate downgrade attacks.",
+    "mitre": ["T1558.004"]
+  },
+  "4769": {
+    "name": "Kerberos Service Ticket Requested",
+    "cat": "kerberos",
+    "sev": "low",
+    "desc": "A Kerberos service ticket (TGS) was requested. Multiple requests with RC4 encryption type (0x17) from the same source are a hallmark of Kerberoasting. Unusual service names, high-volume requests, or tickets for sensitive SPNs (e.g., MSSQL, CIFS on DC) warrant investigation.",
+    "mitre": ["T1558.003"]
+  },
+  "4770": {
+    "name": "Kerberos Service Ticket Renewed",
+    "cat": "kerberos",
+    "sev": "info",
+    "desc": "A Kerberos service ticket was renewed. Very long renewal chains may indicate a Golden Ticket with extended lifetimes.",
+    "mitre": []
+  },
+  "4771": {
+    "name": "Kerberos Pre-authentication Failed",
+    "cat": "kerberos",
+    "sev": "medium",
+    "desc": "Kerberos pre-authentication failed. Failure code 0x18 indicates wrong password. Repeated failures indicate brute force against Kerberos. Code 0x25 indicates the clock skew is too large (possible time manipulation).",
+    "mitre": ["T1110"]
+  },
+  "4772": {
+    "name": "Kerberos Authentication Ticket Request Failed",
+    "cat": "kerberos",
+    "sev": "medium",
+    "desc": "A Kerberos authentication ticket request failed. Investigate the failure code and the requesting account.",
+    "mitre": []
+  },
+  "4773": {
+    "name": "Kerberos Service Ticket Request Failed",
+    "cat": "kerberos",
+    "sev": "medium",
+    "desc": "A Kerberos service ticket request failed. Repeated failures for a specific SPN may indicate enumeration.",
+    "mitre": []
+  },
+  "4774": {
+    "name": "Account Mapped for Logon",
+    "cat": "kerberos",
+    "sev": "low",
+    "desc": "An account was mapped for logon using an alternate credential mapping.",
+    "mitre": []
+  },
+  "4775": {
+    "name": "Account Could Not Be Mapped for Logon",
+    "cat": "kerberos",
+    "sev": "medium",
+    "desc": "An account could not be mapped for logon. May indicate misconfiguration or an attempt to use invalid credentials.",
+    "mitre": []
+  },
+  "4776": {
+    "name": "NTLM Authentication Attempt",
+    "cat": "logon",
+    "sev": "low",
+    "desc": "The domain controller attempted to validate NTLM credentials. High-volume NTLM authentication attempts from a single source against multiple accounts indicate Pass-the-Hash or NTLM brute force. NTLM auth from unexpected sources or to unusual resources warrants investigation.",
+    "mitre": ["T1550.002", "T1110"]
+  },
+  "4777": {
+    "name": "Domain Controller Failed to Validate Credentials",
+    "cat": "logon",
+    "sev": "medium",
+    "desc": "The domain controller failed to validate credentials. Review failure code and source.",
+    "mitre": []
+  },
+  "4778": {
+    "name": "Session Reconnected to Window Station",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "A session was reconnected to a window station. Remote Desktop reconnections are logged here. Unusual session reconnections from unexpected IP addresses may indicate session hijacking.",
+    "mitre": []
+  },
+  "4779": {
+    "name": "Session Disconnected from Window Station",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "A session was disconnected from a window station. Unexpected disconnections may indicate session takeover.",
+    "mitre": []
+  },
+  "4780": {
+    "name": "ACL Set on Admin Group Members",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "The ACL was set on accounts which are members of administrators groups. Part of the AdminSDHolder mechanism — review if unexpected accounts were affected.",
+    "mitre": []
+  },
+  "4781": {
+    "name": "Account Name Changed",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "The name of an account was changed. Renaming accounts, especially built-in Administrator, may be part of defense evasion or persistence.",
+    "mitre": ["T1036"]
+  },
+  "4782": {
+    "name": "Password Hash Accessed",
+    "cat": "account",
+    "sev": "critical",
+    "desc": "The password hash of an account was accessed. This event fires during DCSync-style replication requests or direct NTDS.dit access — strong indicators of credential harvesting.",
+    "mitre": ["T1003.003", "T1003.006"]
+  },
+  "4793": {
+    "name": "Password Policy Checking API Called",
+    "cat": "account",
+    "sev": "low",
+    "desc": "The Password Policy Checking API was called. High-frequency calls may indicate an attacker enumerating password policy requirements before executing a spray attack.",
+    "mitre": ["T1201"]
+  },
+  "4798": {
+    "name": "User's Local Group Membership Enumerated",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A user's local group membership was enumerated. Frequent enumeration of local group memberships from a single process may indicate reconnaissance.",
+    "mitre": ["T1069.001"]
+  },
+  "4799": {
+    "name": "Security-Enabled Local Group Membership Enumerated",
+    "cat": "account",
+    "sev": "medium",
+    "desc": "A security-enabled local group membership was enumerated. Systematic enumeration of local groups like Administrators across multiple hosts indicates lateral movement planning.",
+    "mitre": ["T1069.001"]
+  },
+  "4800": {
+    "name": "Workstation Locked",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "The workstation was locked by the interactive user.",
+    "mitre": []
+  },
+  "4801": {
+    "name": "Workstation Unlocked",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "The workstation was unlocked. Review if unlocked by the expected user.",
+    "mitre": []
+  },
+  "4802": {
+    "name": "Screen Saver Invoked",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "The screen saver was invoked on a workstation.",
+    "mitre": []
+  },
+  "4803": {
+    "name": "Screen Saver Dismissed",
+    "cat": "logon",
+    "sev": "info",
+    "desc": "The screen saver was dismissed.",
+    "mitre": []
+  },
+  "4816": {
+    "name": "RPC Detected Integrity Violation",
+    "cat": "system",
+    "sev": "medium",
+    "desc": "RPC detected an integrity violation while decrypting an incoming message. May indicate a man-in-the-middle attack or protocol tampering.",
+    "mitre": []
+  },
+  "4902": {
+    "name": "Per-user Audit Policy Table Created",
+    "cat": "policy",
+    "sev": "low",
+    "desc": "A per-user audit policy table was created. Indicates per-user audit policy is being configured.",
+    "mitre": []
+  },
+  "4904": {
+    "name": "Attempt to Register Security Event Source",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "An attempt was made to register a security event source. Registering custom event sources can be used to inject false entries or manipulate event logging.",
+    "mitre": ["T1562.001"]
+  },
+  "4905": {
+    "name": "Attempt to Unregister Security Event Source",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "An attempt was made to unregister a security event source.",
+    "mitre": []
+  },
+  "4906": {
+    "name": "CrashOnAuditFail Value Changed",
+    "cat": "policy",
+    "sev": "high",
+    "desc": "The CrashOnAuditFail registry value was changed. Setting this to 1 causes a system crash if audit logging fails. Disabling it removes a critical safety control.",
+    "mitre": ["T1562.002"]
+  },
+  "4907": {
+    "name": "Auditing Settings on Object Changed",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "Auditing settings on an object were changed. Removing audit entries from sensitive objects suppresses visibility into access.",
+    "mitre": ["T1562.001"]
+  },
+  "4908": {
+    "name": "Special Groups Logon Table Modified",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "The Special Groups Logon table was modified. This table defines which groups trigger elevated monitoring.",
+    "mitre": []
+  },
+  "4912": {
+    "name": "Per User Audit Policy Changed",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "Per-user audit policy was changed. Changes to individual audit policies may reduce monitoring coverage for specific accounts.",
+    "mitre": ["T1562.002"]
+  },
+  "4928": {
+    "name": "Active Directory Replica Source NC Established",
+    "cat": "other",
+    "sev": "medium",
+    "desc": "An Active Directory replica source naming context was established. Unexpected replication sources may indicate a rogue domain controller (DCShadow attack).",
+    "mitre": ["T1207"]
+  },
+  "4929": {
+    "name": "Active Directory Replica Source NC Removed",
+    "cat": "other",
+    "sev": "medium",
+    "desc": "An Active Directory replica source naming context was removed.",
+    "mitre": []
+  },
+  "4932": {
+    "name": "Synchronization of Replica of Active Directory NC Begun",
+    "cat": "other",
+    "sev": "medium",
+    "desc": "Synchronization of a replica of an Active Directory naming context has begun. Combined with 4928, may indicate DCShadow or unauthorized replication activity.",
+    "mitre": ["T1207"]
+  },
+  "4933": {
+    "name": "Synchronization of Replica of Active Directory NC Ended",
+    "cat": "other",
+    "sev": "medium",
+    "desc": "Synchronization of a replica of an Active Directory naming context has ended.",
+    "mitre": []
+  },
+  "4934": {
+    "name": "Attributes of Active Directory Object Replicated",
+    "cat": "other",
+    "sev": "low",
+    "desc": "Attributes of an Active Directory object were replicated.",
+    "mitre": []
+  },
+  "4935": {
+    "name": "Replication Failure Begins",
+    "cat": "other",
+    "sev": "medium",
+    "desc": "Replication failure has begun. Persistent replication failures may indicate a DCShadow attack or network isolation.",
+    "mitre": []
+  },
+  "4936": {
+    "name": "Replication Failure Ends",
+    "cat": "other",
+    "sev": "low",
+    "desc": "Replication failure has ended.",
+    "mitre": []
+  },
+  "4946": {
+    "name": "Windows Firewall Exception List Rule Added",
+    "cat": "firewall",
+    "sev": "medium",
+    "desc": "A rule was added to the Windows Firewall exception list. Attackers add firewall rules to allow inbound C2 traffic or expose services. Review the rule details, especially rules allowing inbound connections.",
+    "mitre": ["T1562.004"]
+  },
+  "4947": {
+    "name": "Windows Firewall Exception List Rule Modified",
+    "cat": "firewall",
+    "sev": "medium",
+    "desc": "A rule in the Windows Firewall exception list was modified. Unexpected modification of existing rules may weaken network defenses.",
+    "mitre": ["T1562.004"]
+  },
+  "4948": {
+    "name": "Windows Firewall Exception List Rule Deleted",
+    "cat": "firewall",
+    "sev": "medium",
+    "desc": "A rule in the Windows Firewall exception list was deleted. Deletion of blocking rules or security rules may expose the system.",
+    "mitre": ["T1562.004"]
+  },
+  "4950": {
+    "name": "Windows Firewall Setting Changed",
+    "cat": "firewall",
+    "sev": "high",
+    "desc": "A Windows Firewall setting was changed. Disabling the firewall entirely is a strong indicator of attack preparation.",
+    "mitre": ["T1562.004"]
+  },
+  "4954": {
+    "name": "Windows Firewall Group Policy Settings Changed",
+    "cat": "firewall",
+    "sev": "high",
+    "desc": "Windows Firewall Group Policy settings have changed. Group Policy-level firewall changes affect all machines in scope simultaneously.",
+    "mitre": ["T1562.004", "T1484.001"]
+  },
+  "4956": {
+    "name": "Windows Firewall Active Profile Changed",
+    "cat": "firewall",
+    "sev": "medium",
+    "desc": "Windows Firewall changed the active profile. Profile changes (e.g., from Domain to Public) may result in more permissive firewall rules applying.",
+    "mitre": ["T1562.004"]
+  },
+  "4957": {
+    "name": "Windows Firewall Did Not Apply Rule",
+    "cat": "firewall",
+    "sev": "low",
+    "desc": "Windows Firewall did not apply a rule. May indicate misconfiguration.",
+    "mitre": []
+  },
+  "4964": {
+    "name": "Special Groups Assigned to New Logon",
+    "cat": "logon",
+    "sev": "medium",
+    "desc": "Special groups were assigned to a new logon. Fires when a logon belongs to a group specified in the Special Groups list, which triggers enhanced logging.",
+    "mitre": []
+  },
+  "5038": {
+    "name": "Code Integrity Invalid Image Hash",
+    "cat": "system",
+    "sev": "high",
+    "desc": "Code integrity could not verify the image hash of a file. This may indicate that a binary has been tampered with, replaced by malware, or that an unsigned driver was loaded.",
+    "mitre": ["T1553.002"]
+  },
+  "5056": {
+    "name": "Cryptographic Self Test Performed",
+    "cat": "crypto",
+    "sev": "info",
+    "desc": "A cryptographic self-test was performed. Part of normal FIPS compliance checks.",
+    "mitre": []
+  },
+  "5057": {
+    "name": "Cryptographic Primitive Operation Failed",
+    "cat": "crypto",
+    "sev": "medium",
+    "desc": "A cryptographic primitive operation failed. Repeated failures may indicate tampering with cryptographic libraries or a downgrade attack.",
+    "mitre": []
+  },
+  "5058": {
+    "name": "Key File Operation",
+    "cat": "crypto",
+    "sev": "low",
+    "desc": "A key file operation was performed. Access to key containers may be relevant during credential theft investigations.",
+    "mitre": []
+  },
+  "5059": {
+    "name": "Key Migration Operation",
+    "cat": "crypto",
+    "sev": "low",
+    "desc": "A key migration operation was performed.",
+    "mitre": []
+  },
+  "5060": {
+    "name": "Verification Operation Failed",
+    "cat": "crypto",
+    "sev": "medium",
+    "desc": "A cryptographic verification operation failed.",
+    "mitre": []
+  },
+  "5061": {
+    "name": "Cryptographic Operation",
+    "cat": "crypto",
+    "sev": "low",
+    "desc": "A cryptographic operation was performed (sign, verify, encrypt, decrypt, etc.).",
+    "mitre": []
+  },
+  "5062": {
+    "name": "Kernel-Mode Cryptographic Self Test Performed",
+    "cat": "crypto",
+    "sev": "info",
+    "desc": "A kernel-mode cryptographic self-test was performed.",
+    "mitre": []
+  },
+  "5136": {
+    "name": "Directory Service Object Modified",
+    "cat": "other",
+    "sev": "high",
+    "desc": "A directory service object was modified. Sensitive modifications: changes to AdminSDHolder, GPO objects, Domain Controller computer accounts, or msDS-AllowedToActOnBehalfOfOtherIdentity (RBCD). DCSync-related changes appear here as modifications to AD partition root permissions.",
+    "mitre": ["T1484.001", "T1098"]
+  },
+  "5137": {
+    "name": "Directory Service Object Created",
+    "cat": "other",
+    "sev": "medium",
+    "desc": "A directory service object was created in Active Directory.",
+    "mitre": []
+  },
+  "5138": {
+    "name": "Directory Service Object Undeleted",
+    "cat": "other",
+    "sev": "medium",
+    "desc": "A directory service object was undeleted (restored from AD Recycle Bin).",
+    "mitre": []
+  },
+  "5139": {
+    "name": "Directory Service Object Moved",
+    "cat": "other",
+    "sev": "medium",
+    "desc": "A directory service object was moved within the directory.",
+    "mitre": []
+  },
+  "5140": {
+    "name": "Network Share Object Accessed",
+    "cat": "network",
+    "sev": "low",
+    "desc": "A network share object was accessed. Access to C$, ADMIN$, or IPC$ from unexpected sources indicates lateral movement via PsExec, WMI, or similar tools.",
+    "mitre": ["T1021.002"]
+  },
+  "5141": {
+    "name": "Network Share Object Deleted",
+    "cat": "network",
+    "sev": "medium",
+    "desc": "A network share object was deleted.",
+    "mitre": []
+  },
+  "5142": {
+    "name": "Network Share Object Added",
+    "cat": "network",
+    "sev": "medium",
+    "desc": "A network share object was added. Unauthorized share creation can be used to exfiltrate data or stage lateral movement.",
+    "mitre": []
+  },
+  "5143": {
+    "name": "Network Share Object Changed",
+    "cat": "network",
+    "sev": "medium",
+    "desc": "A network share object was changed. Unexpected permission changes on shares may expose sensitive data.",
+    "mitre": []
+  },
+  "5145": {
+    "name": "Network Share Object Checked to See Whether Client Can Be Granted Desired Access",
+    "cat": "network",
+    "sev": "info",
+    "desc": "A network share object access check was performed. High-volume access checks across many share paths may indicate SMB enumeration.",
+    "mitre": ["T1135"]
+  },
+  "5152": {
+    "name": "Windows Filtering Platform Blocked a Packet",
+    "cat": "network",
+    "sev": "info",
+    "desc": "The Windows Filtering Platform blocked a network packet. Review blocked traffic patterns for signs of C2 communication or port scanning.",
+    "mitre": []
+  },
+  "5154": {
+    "name": "Process Permitted to Listen on Port",
+    "cat": "network",
+    "sev": "low",
+    "desc": "A process was permitted to listen on a port. Unexpected processes listening on non-standard ports may indicate a backdoor or C2 listener.",
+    "mitre": ["T1071"]
+  },
+  "5155": {
+    "name": "Process Blocked from Listening on Port",
+    "cat": "network",
+    "sev": "medium",
+    "desc": "A process was blocked from listening on a port. May indicate an attempted C2 setup that was prevented by policy.",
+    "mitre": []
+  },
+  "5156": {
+    "name": "Windows Filtering Platform Permitted a Connection",
+    "cat": "network",
+    "sev": "info",
+    "desc": "The Windows Filtering Platform permitted a network connection. Review for unexpected outbound connections to external IPs, especially on uncommon ports that may indicate C2 traffic.",
+    "mitre": ["T1071"]
+  },
+  "5157": {
+    "name": "Windows Filtering Platform Blocked a Connection",
+    "cat": "network",
+    "sev": "info",
+    "desc": "The Windows Filtering Platform blocked a network connection. Systematic blocked connection attempts may indicate lateral movement scanning.",
+    "mitre": []
+  },
+  "5158": {
+    "name": "Windows Filtering Platform Permitted a Bind to a Local Port",
+    "cat": "network",
+    "sev": "info",
+    "desc": "The Windows Filtering Platform permitted a local port bind.",
+    "mitre": []
+  },
+  "5168": {
+    "name": "SPN Check for SMB/SMB2 Failed",
+    "cat": "network",
+    "sev": "medium",
+    "desc": "An SPN validation failure occurred for an SMB connection. May indicate an SMB relay or man-in-the-middle attack.",
+    "mitre": ["T1557.001"]
+  },
+  "5376": {
+    "name": "Credential Manager Credentials Backed Up",
+    "cat": "other",
+    "sev": "medium",
+    "desc": "Credential Manager credentials were backed up. Unauthorized backup of credential stores may indicate credential harvesting.",
+    "mitre": ["T1555.004"]
+  },
+  "5377": {
+    "name": "Credential Manager Credentials Restored from a Backup",
+    "cat": "other",
+    "sev": "medium",
+    "desc": "Credential Manager credentials were restored from a backup. Unexpected restoration may indicate an attacker deploying previously captured credentials.",
+    "mitre": ["T1555.004"]
+  },
+  "5378": {
+    "name": "Requested Credentials Delegation Was Disallowed by Policy",
+    "cat": "other",
+    "sev": "low",
+    "desc": "Credential delegation was disallowed by policy. Repeated denials may indicate an attempt to abuse Kerberos delegation.",
+    "mitre": []
+  },
+  "5447": {
+    "name": "Windows Filtering Platform Filter Changed",
+    "cat": "network",
+    "sev": "medium",
+    "desc": "A Windows Filtering Platform filter was changed. Modifying WFP filters can bypass network controls and may be used to allow C2 traffic.",
+    "mitre": ["T1562.004"]
+  },
+  "5478": {
+    "name": "IPsec Services Have Started",
+    "cat": "network",
+    "sev": "info",
+    "desc": "IPsec services have started.",
+    "mitre": []
+  },
+  "5479": {
+    "name": "IPsec Services Have Been Shut Down",
+    "cat": "network",
+    "sev": "medium",
+    "desc": "IPsec services were shut down. Unexpected shutdown of IPsec may expose encrypted communications.",
+    "mitre": []
+  },
+  "5484": {
+    "name": "IPsec Services Has Failed Critically",
+    "cat": "network",
+    "sev": "high",
+    "desc": "IPsec services entered a critical failure state and terminated. May leave the system without IPsec protection.",
+    "mitre": []
+  },
+  "6144": {
+    "name": "Security Policy in Group Policy Objects Applied Successfully",
+    "cat": "policy",
+    "sev": "info",
+    "desc": "Security policy from Group Policy Objects was applied successfully.",
+    "mitre": []
+  },
+  "6145": {
+    "name": "Error Processing Security Policy in Group Policy Objects",
+    "cat": "policy",
+    "sev": "medium",
+    "desc": "One or more errors occurred while processing security policy in Group Policy Objects. May indicate GPO tampering.",
+    "mitre": ["T1484.001"]
+  },
+  "6281": {
+    "name": "Integrity Check Failed on Page Hashes of Image File",
+    "cat": "system",
+    "sev": "high",
+    "desc": "Code integrity failed to verify the page hashes of an image file. May indicate driver or kernel component tampering.",
+    "mitre": ["T1553.002"]
+  },
+  "6410": {
+    "name": "Code Integrity Check Failed to Meet Code Integrity Policy",
+    "cat": "system",
+    "sev": "high",
+    "desc": "A binary failed to meet the code integrity policy requirements. May indicate a tampered or malicious binary was blocked from loading.",
+    "mitre": ["T1553.002"]
+  },
+  "4656": {
+    "name": "Handle to an Object Requested",
+    "cat": "object",
+    "sev": "low",
+    "desc": "A handle was requested for an object. Watch for handle requests to sensitive objects: SAM database, LSASS process, or sensitive files.",
+    "mitre": ["T1003"]
+  },
+  "4657": {
+    "name": "Registry Value Modified",
+    "cat": "object",
+    "sev": "medium",
+    "desc": "A registry value was modified. Persistence mechanisms, defense evasion, and configuration tampering frequently appear as registry modifications. Key paths: Run/RunOnce, Services, LSA, Winlogon.",
+    "mitre": ["T1112", "T1547.001"]
+  },
+  "4658": {
+    "name": "Handle to an Object Closed",
+    "cat": "object",
+    "sev": "info",
+    "desc": "A handle to an object was closed. Pair with 4656 to determine complete object access duration.",
+    "mitre": []
+  },
+  "4660": {
+    "name": "Object Deleted",
+    "cat": "object",
+    "sev": "low",
+    "desc": "An object was deleted. Deletion of security-relevant files or objects may indicate evidence destruction.",
+    "mitre": ["T1070"]
+  },
+  "4662": {
+    "name": "Operation Performed on an Object",
+    "cat": "object",
+    "sev": "high",
+    "desc": "An operation was performed on an Active Directory object. DCSync attacks generate 4662 events with replication GUIDs: DS-Replication-Get-Changes {1131f6aa} and DS-Replication-Get-Changes-All {1131f6ab}. These from non-DC accounts indicate credential dumping.",
+    "mitre": ["T1003.006"]
+  },
+  "4663": {
+    "name": "Attempt Made to Access Object",
+    "cat": "object",
+    "sev": "low",
+    "desc": "An attempt was made to access an object. Monitor for access to LSASS process memory, SAM/NTDS.dit files, or sensitive directories.",
+    "mitre": ["T1003.001"]
+  },
+  "4670": {
+    "name": "Permissions on an Object Changed",
+    "cat": "object",
+    "sev": "medium",
+    "desc": "Permissions on an object were changed. Changes to ACLs on sensitive AD objects, files, or registry keys may indicate privilege escalation or persistence.",
+    "mitre": ["T1222"]
+  },
+  "4692": {
+    "name": "Backup of Data Protection Master Key Attempted",
+    "cat": "object",
+    "sev": "medium",
+    "desc": "A backup of the data protection master key was attempted. The DPAPI master key protects encrypted credentials on Windows. Unauthorized backup may be part of credential theft.",
+    "mitre": ["T1555"]
+  },
+  "4693": {
+    "name": "Recovery of Data Protection Master Key Attempted",
+    "cat": "object",
+    "sev": "high",
+    "desc": "Recovery of the data protection master key was attempted. DPAPI master key recovery can be used to decrypt credentials stored by applications like Chrome, Windows Credential Manager, and WiFi passwords.",
+    "mitre": ["T1555"]
+  }
+}
