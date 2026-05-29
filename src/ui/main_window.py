@@ -9,11 +9,13 @@ from pathlib import Path
 
 from PySide6.QtCore import (
     QAbstractTableModel,
+    QDateTime,
     QModelIndex,
     QPoint,
     QSortFilterProxyModel,
     Qt,
     QThread,
+    QTimer,
     Signal,
 )
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence
@@ -21,6 +23,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QDateTimeEdit,
     QDockWidget,
     QFileDialog,
     QFrame,
@@ -182,6 +185,9 @@ class EventFilter(QSortFilterProxyModel):
         self._search   = ""
         self._category = "All"
         self._sevs: set[str] = {"critical", "high", "medium", "low", "info"}
+        # float Unix timestamps — None means no bound (fastest comparison possible)
+        self._ts_from: float | None = None
+        self._ts_to:   float | None = None
         self.setFilterCaseSensitivity(Qt.CaseInsensitive)
         self.setSortRole(Qt.UserRole)
 
@@ -195,6 +201,15 @@ class EventFilter(QSortFilterProxyModel):
             return False
         if self._category != "All" and ev.cat != self._category:
             return False
+
+        # Timestamp range — float comparison, no allocations
+        if (self._ts_from is not None or self._ts_to is not None) and ev.timestamp:
+            ts = ev.timestamp.timestamp()
+            if self._ts_from is not None and ts < self._ts_from:
+                return False
+            if self._ts_to is not None and ts > self._ts_to:
+                return False
+
         if self._search:
             needle = self._search.lower()
             hay = " ".join([
@@ -218,6 +233,11 @@ class EventFilter(QSortFilterProxyModel):
             self._sevs.add(sev)
         else:
             self._sevs.discard(sev)
+        self.invalidateFilter()
+
+    def set_time_range(self, ts_from: float | None, ts_to: float | None) -> None:
+        self._ts_from = ts_from
+        self._ts_to   = ts_to
         self.invalidateFilter()
 
 
@@ -536,13 +556,20 @@ class MainWindow(QMainWindow):
         self._stats_worker: StatsWorker | None = None
         self._highlighted_ids: set[int] = set()
         self._loading_fname: str = ""
+        self._loaded_ts_min: float | None = None   # full range of loaded file
+        self._loaded_ts_max: float | None = None
 
-        # Debounce timer — only trigger filter 300 ms after user stops typing
-        from PySide6.QtCore import QTimer
+        # Debounce: search fires 300 ms after user stops typing
         self._search_timer = QTimer()
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(300)
         self._search_timer.timeout.connect(self._apply_search)
+
+        # Debounce: date pickers fire 400 ms after user stops changing
+        self._dt_timer = QTimer()
+        self._dt_timer.setSingleShot(True)
+        self._dt_timer.setInterval(400)
+        self._dt_timer.timeout.connect(self._apply_dt_filter)
 
         self._load_style()
         self._build_ui()
@@ -557,6 +584,17 @@ class MainWindow(QMainWindow):
             qss_path = Path(__file__).parent.parent / "resources" / "style.qss"
         if qss_path.exists():
             QApplication.instance().setStyleSheet(qss_path.read_text(encoding="utf-8"))
+
+        # Logo — loaded gracefully; if not present the default system icon is used
+        from PySide6.QtGui import QIcon
+        if getattr(sys, "frozen", False):
+            logo_path = Path(sys._MEIPASS) / "resources" / "logo.png"  # type: ignore[attr-defined]
+        else:
+            logo_path = Path(__file__).parent.parent / "resources" / "logo.png"
+        if logo_path.exists():
+            icon = QIcon(str(logo_path))
+            QApplication.instance().setWindowIcon(icon)
+            self.setWindowIcon(icon)
 
     # ── UI construction ────────────────────────────────────────────────────
     def _build_ui(self) -> None:
@@ -633,6 +671,49 @@ class MainWindow(QMainWindow):
         self._progress.setTextVisible(True)
         self._progress.setVisible(False)
         tb.addWidget(self._progress)
+
+        # ── Time-range toolbar ───────────────────────────────────────────
+        tb2 = QToolBar("Zeitraum", self)
+        tb2.setMovable(False)
+        self.addToolBar(tb2)
+
+        for lbl_text in ("Von:",):
+            lbl = QLabel(lbl_text)
+            lbl.setStyleSheet("color:#a6adc8; background:transparent; padding: 0 4px;")
+            tb2.addWidget(lbl)
+
+        self._dt_from_picker = QDateTimeEdit()
+        self._dt_from_picker.setDisplayFormat("dd.MM.yyyy  HH:mm")
+        self._dt_from_picker.setCalendarPopup(True)
+        self._dt_from_picker.setFixedWidth(160)
+        self._dt_from_picker.setToolTip("Frühester Zeitpunkt (Von)")
+        self._dt_from_picker.dateTimeChanged.connect(lambda _: self._dt_timer.start())
+        tb2.addWidget(self._dt_from_picker)
+
+        arrow_lbl = QLabel("→")
+        arrow_lbl.setStyleSheet("color:#45475a; background:transparent; padding: 0 6px; font-size:11pt;")
+        tb2.addWidget(arrow_lbl)
+
+        bis_lbl = QLabel("Bis:")
+        bis_lbl.setStyleSheet("color:#a6adc8; background:transparent; padding: 0 4px;")
+        tb2.addWidget(bis_lbl)
+
+        self._dt_to_picker = QDateTimeEdit()
+        self._dt_to_picker.setDisplayFormat("dd.MM.yyyy  HH:mm")
+        self._dt_to_picker.setCalendarPopup(True)
+        self._dt_to_picker.setFixedWidth(160)
+        self._dt_to_picker.setToolTip("Spätester Zeitpunkt (Bis)")
+        self._dt_to_picker.dateTimeChanged.connect(lambda _: self._dt_timer.start())
+        tb2.addWidget(self._dt_to_picker)
+
+        tb2.addSeparator()
+        btn_clear_dt = tb2.addAction("Filter zurücksetzen ✕")
+        btn_clear_dt.setToolTip("Zeitraum-Filter löschen")
+        btn_clear_dt.triggered.connect(self._clear_dt_filter)
+
+        # Disable until a file is loaded
+        self._tb2 = tb2
+        tb2.setEnabled(False)
 
         # ── Empty state ───────────────────────────────────────────────────
         empty_widget = QWidget()
@@ -813,11 +894,12 @@ class MainWindow(QMainWindow):
         )
 
     def _on_load_finished(self, total: int) -> None:
-        from PySide6.QtCore import QTimer
         self._progress.setValue(100)
         self._load_label.setText(f"Done  —  {total:,} events  |  Running detections…")
         self.setWindowTitle(f"LogHawk — {total:,} events loaded")
         self._stack.setCurrentIndex(1)   # show events view
+        self._set_dt_range_from_events()  # populate pickers, enable toolbar
+        self._tb2.setEnabled(True)
         self._update_status()
 
         # Both detection and stats run in background — UI stays live
@@ -1029,6 +1111,53 @@ class MainWindow(QMainWindow):
             f"Exported {len(visible_events):,} events to:\n{path}"
         )
 
+    # ── Date / time filter ───────────────────────────────────────────────────
+    def _set_dt_range_from_events(self) -> None:
+        """Auto-populate pickers with the actual event range. No filter applied."""
+        timestamps = [e.timestamp.timestamp() for e in self._events if e.timestamp]
+        if not timestamps:
+            return
+        self._loaded_ts_min = min(timestamps)
+        self._loaded_ts_max = max(timestamps)
+
+        for picker, ts in (
+            (self._dt_from_picker, self._loaded_ts_min),
+            (self._dt_to_picker,   self._loaded_ts_max),
+        ):
+            picker.blockSignals(True)
+            dt = datetime.fromtimestamp(ts)
+            picker.setDateTime(
+                QDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+            )
+            picker.blockSignals(False)
+
+        # Set filter bounds to full range = all events pass = no visible change
+        self._proxy._ts_from = self._loaded_ts_min
+        self._proxy._ts_to   = self._loaded_ts_max
+
+    def _apply_dt_filter(self) -> None:
+        """Read picker values and apply to the proxy filter."""
+        def _to_ts(picker: QDateTimeEdit) -> float:
+            qdt = picker.dateTime()
+            dt  = datetime(
+                qdt.date().year(), qdt.date().month(), qdt.date().day(),
+                qdt.time().hour(), qdt.time().minute(), qdt.time().second(),
+            )
+            return dt.timestamp()
+
+        self._proxy.set_time_range(_to_ts(self._dt_from_picker), _to_ts(self._dt_to_picker))
+        self._update_status()
+
+    def _clear_dt_filter(self) -> None:
+        """Reset pickers to full loaded range and remove the filter."""
+        if self._loaded_ts_min is None:
+            return
+        self._set_dt_range_from_events()
+        # Full range = show all events, but still call invalidateFilter so
+        # any previous tighter range is released.
+        self._proxy.set_time_range(self._loaded_ts_min, self._loaded_ts_max)
+        self._update_status()
+
     # ── Right-click context menu ─────────────────────────────────────────────
     def _on_table_context_menu(self, pos: QPoint) -> None:
         idx = self._table.indexAt(pos)
@@ -1167,6 +1296,8 @@ class MainWindow(QMainWindow):
         self._detail_raw.clear()
         self._detail_stats.setHtml("")
         self._stack.setCurrentIndex(0)   # back to empty state
+        self._tb2.setEnabled(False)
+        self._proxy.set_time_range(None, None)
         self.setWindowTitle("LogHawk — Security Event Log Analyzer")
         self._update_status()
 

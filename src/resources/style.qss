@@ -117,6 +117,43 @@ QComboBox QAbstractItemView {
     outline: none;
 }
 
+/* ── Date / Time Edit ──────────────────────────────────────────────────── */
+QDateTimeEdit {
+    background-color: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    padding: 4px 24px 4px 8px;
+}
+QDateTimeEdit:hover  { border-color: #7c3aed; }
+QDateTimeEdit:focus  { border-color: #7c3aed; }
+QDateTimeEdit::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    width: 20px;
+    border: none;
+}
+QDateTimeEdit::down-arrow {
+    image: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #a6adc8;
+    width: 0; height: 0; margin-right: 4px;
+}
+QCalendarWidget {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+}
+QCalendarWidget QAbstractItemView {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+    selection-background-color: #7c3aed;
+    selection-color: #ffffff;
+}
+QCalendarWidget QWidget#qt_calendar_navigationbar {
+    background-color: #181825;
+}
+
 /* ── Check Boxes ───────────────────────────────────────────────────────── */
 QCheckBox {
     color: #cdd6f4;
