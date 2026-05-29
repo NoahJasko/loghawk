@@ -64,7 +64,7 @@ def parse_csv(
         if progress_cb and i % 500 == 0:
             progress_cb(int(i / max(total, 1) * 100))
 
-        row_lower = {k.strip().lower(): v.strip() for k, v in row.items()}
+        row_lower = {k.strip().lower(): (v or "").strip() for k, v in row.items()}
 
         eid_raw  = row_lower.get("event id") or row_lower.get("eventid") or row_lower.get("id") or "0"
         event_id = _coerce_int(re.sub(r"\D", "", eid_raw))
