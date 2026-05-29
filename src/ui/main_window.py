@@ -585,16 +585,10 @@ class MainWindow(QMainWindow):
         if qss_path.exists():
             QApplication.instance().setStyleSheet(qss_path.read_text(encoding="utf-8"))
 
-        # Logo — loaded gracefully; if not present the default system icon is used
-        from PySide6.QtGui import QIcon
-        if getattr(sys, "frozen", False):
-            logo_path = Path(sys._MEIPASS) / "resources" / "logo.png"  # type: ignore[attr-defined]
-        else:
-            logo_path = Path(__file__).parent.parent / "resources" / "logo.png"
-        if logo_path.exists():
-            icon = QIcon(str(logo_path))
-            QApplication.instance().setWindowIcon(icon)
-            self.setWindowIcon(icon)
+        # Inherit the icon set by loghawk.py on the QApplication instance
+        app_icon = QApplication.instance().windowIcon()
+        if not app_icon.isNull():
+            self.setWindowIcon(app_icon)
 
     # ── UI construction ────────────────────────────────────────────────────
     def _build_ui(self) -> None:
