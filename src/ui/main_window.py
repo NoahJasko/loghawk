@@ -769,9 +769,9 @@ class MainWindow(QMainWindow):
         self._table.customContextMenuRequested.connect(self._on_table_context_menu)
         splitter.addWidget(self._table)
 
-        # Details panel (tab widget)
+        # Details panel (tab widget) — no fixed height so the splitter is freely draggable
         self._detail_tabs = QTabWidget()
-        self._detail_tabs.setFixedHeight(230)
+        self._detail_tabs.setMinimumHeight(80)
         self._detail_summary = QTextBrowser()
         self._detail_summary.setOpenExternalLinks(False)
         self._detail_raw = QTextBrowser()
@@ -784,6 +784,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._detail_tabs)
         splitter.setStretchFactor(0, 4)
         splitter.setStretchFactor(1, 1)
+        splitter.setSizes([620, 220])   # sensible default, user can drag freely
 
         # ── Detections dock ───────────────────────────────────────────────
         dock = QDockWidget("Detections", self)

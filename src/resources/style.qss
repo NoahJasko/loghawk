@@ -214,13 +214,22 @@ QSplitter::handle {
     background-color: #313244;
 }
 QSplitter::handle:vertical {
-    height: 3px;
+    height: 6px;
+    background-color: #313244;
+    border-top: 1px solid #45475a;
+    border-bottom: 1px solid #45475a;
 }
 QSplitter::handle:horizontal {
-    width: 3px;
+    width: 6px;
+    background-color: #313244;
+    border-left: 1px solid #45475a;
+    border-right: 1px solid #45475a;
 }
 QSplitter::handle:hover {
     background-color: #7c3aed;
+}
+QSplitter::handle:pressed {
+    background-color: #6d28d9;
 }
 
 /* ── Tabs ──────────────────────────────────────────────────────────────── */
