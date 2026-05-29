@@ -7,20 +7,18 @@ from __future__ import annotations
 
 import sys
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
 from .event_db import enrich
 
-WINDOWS = sys.platform == "win32"
-
 _NS = "http://schemas.microsoft.com/win/2004/08/events/event"
 _Q  = f"{{{_NS}}}"
 
-# Only keep fields used by detection rules and column display.
-# Storing every XML field for millions of events causes multi-GB RAM usage.
+WINDOWS = sys.platform == "win32"
+
 _KEEP_FIELDS: frozenset[str] = frozenset({
     "SubjectUserName", "SubjectDomainName", "SubjectUserSid",
     "TargetUserName",  "TargetDomainName",  "TargetUserSid",
@@ -54,6 +52,7 @@ class ParsedEvent:
     logon_type:   str
     auth_package: str
     raw_fields:   dict
+    # enriched from event_db
     name:  str
     cat:   str
     sev:   str
@@ -123,8 +122,7 @@ def _parse_xml(xml_str: str) -> ParsedEvent | None:
     )
 
 
-_EVTNEXT_BATCH = 2_000
-_EMIT_BATCH    = 2_000
+_EMIT_BATCH = 2_000
 
 
 def parse_evtx(
@@ -164,7 +162,7 @@ def parse_evtx(
 
     while True:
         try:
-            raw_events = win32evtlog.EvtNext(query, _EVTNEXT_BATCH)
+            raw_events = win32evtlog.EvtNext(query, 500)
         except pywintypes.error:
             break
         if not raw_events:
@@ -199,6 +197,7 @@ def parse_evtx(
 
 
 def fetch_event_xml(filepath: str | Path, record_id: int) -> str | None:
+    """Re-read a single event by record_id for on-demand full-field display."""
     if not WINDOWS:
         return None
     try:
