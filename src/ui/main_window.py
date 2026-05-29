@@ -266,6 +266,18 @@ class DetectionWorker(QThread):
         self.finished.emit(results)
 
 
+class StatsWorker(QThread):
+    finished = Signal(str)   # rendered HTML
+
+    def __init__(self, events: list):
+        super().__init__()
+        self._events = events
+
+    def run(self) -> None:
+        html = _build_stats_html(self._events)
+        self.finished.emit(html)
+
+
 # ── Detection card widget ─────────────────────────────────────────────────────
 
 class DetectionCard(QFrame):
@@ -521,8 +533,16 @@ class MainWindow(QMainWindow):
         self._detections: list[detection_engine.Detection] = []
         self._worker: LoadWorker | None = None
         self._det_worker: DetectionWorker | None = None
+        self._stats_worker: StatsWorker | None = None
         self._highlighted_ids: set[int] = set()
         self._loading_fname: str = ""
+
+        # Debounce timer — only trigger filter 300 ms after user stops typing
+        from PySide6.QtCore import QTimer
+        self._search_timer = QTimer()
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(300)
+        self._search_timer.timeout.connect(self._apply_search)
 
         self._load_style()
         self._build_ui()
@@ -561,7 +581,7 @@ class MainWindow(QMainWindow):
         self._search_box = QLineEdit()
         self._search_box.setPlaceholderText("Event ID, name, user, IP…")
         self._search_box.setFixedWidth(220)
-        self._search_box.textChanged.connect(self._on_search)
+        self._search_box.textChanged.connect(lambda _: self._search_timer.start())
         tb.addWidget(self._search_box)
 
         # Clear search button
@@ -798,13 +818,18 @@ class MainWindow(QMainWindow):
         self._load_label.setText(f"Done  —  {total:,} events  |  Running detections…")
         self.setWindowTitle(f"LogHawk — {total:,} events loaded")
         self._stack.setCurrentIndex(1)   # show events view
-        self._update_stats()
         self._update_status()
 
-        # Run detection in the background — never blocks the UI
-        self._det_worker = DetectionWorker(list(self._events))
+        # Both detection and stats run in background — UI stays live
+        snapshot = list(self._events)
+
+        self._det_worker = DetectionWorker(snapshot)
         self._det_worker.finished.connect(self._on_detections_ready)
         self._det_worker.start()
+
+        self._stats_worker = StatsWorker(snapshot)
+        self._stats_worker.finished.connect(self._detail_stats.setHtml)
+        self._stats_worker.start()
 
         QTimer.singleShot(1800, lambda: (
             self._progress.setVisible(False),
@@ -942,7 +967,12 @@ class MainWindow(QMainWindow):
             self._detail_raw.setPlainText("(no field data)")
 
     # ── Filters ─────────────────────────────────────────────────────────────
-    def _on_search(self, text: str) -> None:
+    def _apply_search(self) -> None:
+        self._proxy.set_search(self._search_box.text())
+        self._update_status()
+
+    def _on_search(self, text: str) -> None:   # kept for direct calls (e.g. context menu)
+        self._search_timer.stop()
         self._proxy.set_search(text)
         self._update_status()
 
@@ -1039,7 +1069,11 @@ class MainWindow(QMainWindow):
 
     # ── Statistics ────────────────────────────────────────────────────────────
     def _update_stats(self) -> None:
-        self._detail_stats.setHtml(_build_stats_html(self._events))
+        if not self._events:
+            return
+        self._stats_worker = StatsWorker(list(self._events))
+        self._stats_worker.finished.connect(self._detail_stats.setHtml)
+        self._stats_worker.start()
 
     # ── Export detection report ───────────────────────────────────────────────
     def _export_detection_report(self) -> None:
