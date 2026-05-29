@@ -395,45 +395,43 @@ class DetectionCard(QFrame):
 
 # ── On-demand full field parser ───────────────────────────────────────────────
 
-def _all_fields_from_event(ev: ParsedEvent) -> dict[str, str]:
+def _all_fields_from_event(ev: ParsedEvent, filepath: str = "", filetype: str = "") -> dict[str, str]:
     """
-    Return every key-value field for an event.
-    For EVTX events: re-parses the stored raw XML to get ALL fields.
-    For CSV events:  returns the fields already stored in raw_fields.
-    Called only when the user clicks a row — never during bulk loading.
+    Return every field for on-demand display in the Raw Fields tab.
+    EVTX: re-reads the single event from the source file by record_id
+          using the Windows EvtQuery API — zero RAM overhead during loading.
+    CSV:  returns the columns already in raw_fields.
+    Called only when the user clicks a row.
     """
-    if ev.raw_xml:
-        import xml.etree.ElementTree as ET
-        _NS = "http://schemas.microsoft.com/win/2004/08/events/event"
-        _Q  = f"{{{_NS}}}"
-        fields: dict[str, str] = {}
+    if filepath and filetype == "evtx":
         try:
-            root = ET.fromstring(ev.raw_xml)
-            # System fields
-            sys_el = root.find(f"{_Q}System")
-            if sys_el is not None:
-                for child in sys_el:
-                    tag = child.tag.replace(_Q, "")
-                    if child.text and child.text.strip():
-                        fields[tag] = child.text.strip()
-                    # Include attributes (e.g. TimeCreated SystemTime=...)
-                    for attr, val in child.attrib.items():
-                        if val:
-                            fields[f"{tag}.{attr}"] = val
-            # EventData / UserData — every Data element
-            for section_tag in ("EventData", "UserData"):
-                section = root.find(f"{_Q}{section_tag}")
-                if section is not None:
-                    for data in section.iter(f"{_Q}Data"):
-                        name  = data.get("Name") or data.tag.replace(_Q, "")
-                        value = (data.text or "").strip()
-                        fields[name] = value
-                    if section.text and section.text.strip():
-                        fields["_text"] = section.text.strip()
+            import xml.etree.ElementTree as ET
+            from ..core.parser_evtx import fetch_event_xml
+            xml_str = fetch_event_xml(filepath, ev.record_id)
+            if xml_str:
+                _NS = "http://schemas.microsoft.com/win/2004/08/events/event"
+                _Q  = f"{{{_NS}}}"
+                fields: dict[str, str] = {}
+                root = ET.fromstring(xml_str)
+                sys_el = root.find(f"{_Q}System")
+                if sys_el is not None:
+                    for child in sys_el:
+                        tag = child.tag.replace(_Q, "")
+                        if child.text and child.text.strip():
+                            fields[tag] = child.text.strip()
+                        for attr, val in child.attrib.items():
+                            if val:
+                                fields[f"{tag}.{attr}"] = val
+                for section_tag in ("EventData", "UserData"):
+                    section = root.find(f"{_Q}{section_tag}")
+                    if section is not None:
+                        for data in section.iter(f"{_Q}Data"):
+                            name  = data.get("Name") or data.tag.replace(_Q, "")
+                            fields[name] = (data.text or "").strip()
+                return fields
         except Exception:
-            fields = dict(ev.raw_fields)
-        return fields
-    # CSV path — raw_fields already contains all available columns
+            pass
+    # CSV or fallback — show the detection key fields we already have
     return dict(ev.raw_fields)
 
 
@@ -556,6 +554,8 @@ class MainWindow(QMainWindow):
         self._stats_worker: StatsWorker | None = None
         self._highlighted_ids: set[int] = set()
         self._loading_fname: str = ""
+        self._current_filepath: str = ""
+        self._current_filetype: str = ""
         self._loaded_ts_min: float | None = None   # full range of loaded file
         self._loaded_ts_max: float | None = None
 
@@ -867,6 +867,8 @@ class MainWindow(QMainWindow):
         self._model.clear()
         self._events = []
         self._clear_detections()
+        self._current_filepath = path
+        self._current_filetype = file_type
         self._loading_fname = Path(path).name
         self._progress.setValue(0)
         self._progress.setVisible(True)
@@ -1038,8 +1040,8 @@ class MainWindow(QMainWindow):
         """
         self._detail_summary.setHtml(html)
 
-        # Raw Fields tab — parse full XML on demand so the user sees every field
-        all_fields = _all_fields_from_event(ev)
+        # Raw Fields tab — re-reads single event from file on demand (no RAM overhead)
+        all_fields = _all_fields_from_event(ev, self._current_filepath, self._current_filetype)
         if all_fields:
             rows = "\n".join(f"  {k:<40} {v}" for k, v in sorted(all_fields.items()))
             self._detail_raw.setPlainText(
@@ -1299,6 +1301,8 @@ class MainWindow(QMainWindow):
         self._stack.setCurrentIndex(0)   # back to empty state
         self._tb2.setEnabled(False)
         self._proxy.set_time_range(None, None)
+        self._current_filepath = ""
+        self._current_filetype = ""
         self.setWindowTitle("LogHawk — Security Event Log Analyzer")
         self._update_status()
 

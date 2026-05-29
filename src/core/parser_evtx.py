@@ -66,8 +66,7 @@ class ParsedEvent:
     source_ip:    str
     logon_type:   str
     auth_package: str
-    raw_fields:   dict   # ~30 key fields for detection (fast access)
-    raw_xml:      str    # full original XML — parsed on demand for the details panel
+    raw_fields:   dict   # ~30 key fields used by detection rules
     # enriched from event_db
     name:  str
     cat:   str
@@ -137,7 +136,6 @@ def _parse_xml(xml_str: str) -> ParsedEvent | None:
         logon_type=logon_type,
         auth_package=auth_package,
         raw_fields=raw_fields,
-        raw_xml=xml_str,         # stored for full on-demand field display
         name=info["name"],
         cat=info["cat"],
         sev=info["sev"],
@@ -226,6 +224,30 @@ def parse_evtx(
         progress_cb(100)
 
     return collected  # empty when batch_cb was used
+
+
+def fetch_event_xml(filepath: str | Path, record_id: int) -> str | None:
+    """
+    Re-read a single event by record_id for on-demand full-field display.
+    Called only when the user clicks a row — never during bulk loading.
+    Returns the raw XML string, or None on any error.
+    """
+    if not WINDOWS:
+        return None
+    try:
+        import win32evtlog  # type: ignore
+        import pywintypes   # type: ignore
+        query = win32evtlog.EvtQuery(
+            str(Path(filepath).resolve()),
+            win32evtlog.EvtQueryFilePath | win32evtlog.EvtQueryForwardDirection,
+            f"*[System[EventRecordID={record_id}]]",
+        )
+        events = win32evtlog.EvtNext(query, 1)
+        if events:
+            return win32evtlog.EvtRender(events[0], win32evtlog.EvtRenderEventXml)
+    except Exception:
+        pass
+    return None
 
 
 def _get_record_count(path: str) -> int:
