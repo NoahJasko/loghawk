@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import sys
+import xml.etree.ElementTree as _ET
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,19 +17,21 @@ from .event_db import enrich
 
 WINDOWS = sys.platform == "win32"
 
-# ── Pre-compiled patterns — evaluated once at import, reused for every event ──
-# Each search covers ~1 000 bytes and returns in < 5 µs.
-# Previously we called ET.fromstring() (~80 µs/event) + multiple .find() calls.
-# For 3 M events that was ~4 minutes of pure parsing; regex cuts it to ~40 s.
+_NS = "http://schemas.microsoft.com/win/2004/08/events/event"
+_Q  = f"{{{_NS}}}"
 
-_P_EVENT_ID  = re.compile(r'<EventID(?:\s[^>]*)?>(\d+)<')
-_P_RECORD_ID = re.compile(r'<EventRecordID>(\d+)<')
-_P_SYS_TIME  = re.compile(r'SystemTime="([^"]*)"')
-_P_COMPUTER  = re.compile(r'<Computer>([^<]*)<')
-# Matches every <Data Name="KEY">VALUE</Data> in one pass over the string.
-# [^<]* is intentional: values containing '<' are XML-escaped as &lt; so the
-# literal '<' never appears in the value text.
-_P_DATA      = re.compile(r'<Data Name="([^"]+)">([^<]*)<')
+# ── Pre-compiled patterns ─────────────────────────────────────────────────────
+# Windows Event XML uses single OR double quotes for attributes depending on
+# Windows version / EvtRender implementation.  All patterns handle both.
+
+# <EventID>4624</EventID>  OR  <EventID Qualifiers="16384">4624</EventID>
+_P_EVENT_ID  = re.compile(r'<EventID[^>]*>(\d+)<')
+_P_RECORD_ID = re.compile(r'<EventRecordID[^>]*>(\d+)<')
+# SystemTime='2024-...'  OR  SystemTime="2024-..."
+_P_SYS_TIME  = re.compile(r"SystemTime=['\"]([^'\"]*)['\"]")
+_P_COMPUTER  = re.compile(r'<Computer[^>]*>([^<]+)<')
+# <Data Name='Key'>Value</Data>  OR  <Data Name="Key">Value</Data>
+_P_DATA      = re.compile(r"<Data Name=['\"]([^'\"]+)['\"]>([^<]*)<")
 
 # Fields kept in raw_fields for detection rules and column display.
 _KEEP_FIELDS: frozenset[str] = frozenset({
@@ -84,21 +87,31 @@ class ParsedEvent:
     mitre: list
 
 
-def _parse_xml(xml_str: str) -> ParsedEvent | None:
+def _parse_xml(xml_str) -> ParsedEvent | None:
     """
-    Parse a Windows event XML string using pre-compiled regex patterns.
-    ~6× faster than xml.etree.ElementTree for bulk loading.
+    Parse a Windows event XML string.
+    Fast path: pre-compiled regex (~15 µs/event).
+    Fallback:  xml.etree.ElementTree when the regex can't find EventID
+               (handles unusual EvtRender output / encoding edge cases).
     """
+    # pywin32 usually returns str, but guard against bytes just in case
+    if isinstance(xml_str, (bytes, bytearray)):
+        try:
+            xml_str = xml_str.decode("utf-16-le").lstrip("﻿")
+        except UnicodeDecodeError:
+            xml_str = xml_str.decode("utf-8", errors="replace")
+
+    # ── Fast regex path ───────────────────────────────────────────────────
     m = _P_EVENT_ID.search(xml_str)
     if not m:
-        return None
+        return _parse_xml_et(xml_str)          # rare — fall back to ET
     event_id = int(m.group(1))
 
     m = _P_RECORD_ID.search(xml_str)
     record_id = int(m.group(1)) if m else 0
 
     m = _P_COMPUTER.search(xml_str)
-    computer = m.group(1) if m else ""
+    computer = m.group(1).strip() if m else ""
 
     timestamp: datetime | None = None
     m = _P_SYS_TIME.search(xml_str)
@@ -111,21 +124,66 @@ def _parse_xml(xml_str: str) -> ParsedEvent | None:
         except ValueError:
             pass
 
-    # Single-pass extraction of all EventData/UserData fields we care about
     raw_fields: dict[str, str] = {
         name: value
         for name, value in _P_DATA.findall(xml_str)
         if name in _KEEP_FIELDS
     }
 
+    return _make_event(event_id, record_id, computer, timestamp, raw_fields)
+
+
+def _parse_xml_et(xml_str: str) -> ParsedEvent | None:
+    """Fallback parser using ElementTree — correct but ~6× slower."""
+    try:
+        root = _ET.fromstring(xml_str)
+    except _ET.ParseError:
+        return None
+    sys_el = root.find(f"{_Q}System")
+    if sys_el is None:
+        return None
+
+    def st(tag: str) -> str:
+        el = sys_el.find(f"{_Q}{tag}")
+        return el.text.strip() if el is not None and el.text else ""
+
+    event_id  = int(st("EventID") or 0)
+    record_id = int(st("EventRecordID") or 0)
+    computer  = st("Computer")
+
+    time_el = sys_el.find(f"{_Q}TimeCreated")
+    timestamp: datetime | None = None
+    if time_el is not None:
+        raw_ts = time_el.get("SystemTime", "")
+        try:
+            raw_ts = raw_ts.rstrip("Z").split(".")[0]
+            timestamp = datetime.strptime(raw_ts, "%Y-%m-%dT%H:%M:%S").replace(
+                tzinfo=timezone.utc
+            )
+        except ValueError:
+            pass
+
+    raw_fields: dict[str, str] = {}
+    for tag in ("EventData", "UserData"):
+        section = root.find(f"{_Q}{tag}")
+        if section is not None:
+            for data in section.iter(f"{_Q}Data"):
+                name = data.get("Name") or ""
+                if name in _KEEP_FIELDS:
+                    raw_fields[name] = (data.text or "").strip()
+
+    return _make_event(event_id, record_id, computer, timestamp, raw_fields)
+
+
+def _make_event(
+    event_id: int,
+    record_id: int,
+    computer: str,
+    timestamp: datetime | None,
+    raw_fields: dict,
+) -> ParsedEvent:
     def rf(key: str) -> str:
         return raw_fields.get(key, "")
-
-    user         = rf("TargetUserName") or rf("SubjectUserName") or "-"
-    domain       = rf("TargetDomainName") or rf("SubjectDomainName") or "-"
-    source_ip    = rf("IpAddress") or rf("WorkstationName") or "-"
-    logon_type   = rf("LogonType")
-    auth_package = rf("AuthenticationPackageName") or rf("PackageName")
 
     info = enrich(event_id)
     return ParsedEvent(
@@ -133,11 +191,11 @@ def _parse_xml(xml_str: str) -> ParsedEvent | None:
         event_id=event_id,
         timestamp=timestamp,
         computer=computer,
-        user=user,
-        domain=domain,
-        source_ip=source_ip,
-        logon_type=logon_type,
-        auth_package=auth_package,
+        user=rf("TargetUserName") or rf("SubjectUserName") or "-",
+        domain=rf("TargetDomainName") or rf("SubjectDomainName") or "-",
+        source_ip=rf("IpAddress") or rf("WorkstationName") or "-",
+        logon_type=rf("LogonType"),
+        auth_package=rf("AuthenticationPackageName") or rf("PackageName"),
         raw_fields=raw_fields,
         name=info["name"],
         cat=info["cat"],
